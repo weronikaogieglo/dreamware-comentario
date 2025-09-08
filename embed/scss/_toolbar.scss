@@ -11,13 +11,38 @@
     }
 
     .comentario-btn-tool {
-        --cmntr-btn-color: var(--cmntr-muted-color);
+        --cmntr-btn-color: var(--Gradient-Main-gradient, linear-gradient(86deg, #FF003C -2.29%, #E0F 100%)) !important;
+        --cmntr-btn-bg: var(--cmntr-btn-color) !important;
+        --cmntr-btn-hover-bg: linear-gradient(86deg, #E0F 0%, #FF003C 100%) !important;
 
-        margin: 0;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        opacity: 0.5;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        opacity: 1 !important;
+        background: var(--cmntr-btn-color) !important;
+        border-radius: 4px !important;
+        color: white !important;
+
+        &:hover {
+            background: var(--cmntr-btn-hover-bg) !important;
+        }
+
+        .comentario-icon {
+            fill: currentColor !important;
+            
+            &[data-icon="emoji"],
+            &[data-icon="giphy"] {
+                fill: none !important;
+            }
+        }
+        
+        &.btn-emoji,
+        &.btn-giphy {
+            .comentario-icon {
+                fill: none !important;
+            }
+        }
 
         &.comentario-btn-lg {
             width: 40px;

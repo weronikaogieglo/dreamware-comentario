@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: 'A sua conta foi criada com sucesso. Por favor, cheque o seu email e clique no link de confirmação que enviamos.'}
-- {id: actionAddComment,            translation: 'Comentar'}
+- {id: actionAddComment,            translation: 'Publicar'}
 - {id: actionApprove,               translation: 'Aprovar'}
 - {id: actionCancel,                translation: 'Cancelar'}
 - {id: actionClose,                 translation: 'Fechar'}
@@ -115,6 +115,7 @@
 - {id: statusEditedByModerator,     translation: 'editado por um(a) moderador(a)'}
 - {id: statusModerator,             translation: 'Moderador(a)'}
 - {id: statusPending,               translation: 'Pendente'}
+- {id: statusUnknownUser,           translation: 'Usuário desconhecido'}
 - {id: stickyComment,               translation: 'Comentário fixo'}
 - {id: technicalDetails,            translation: 'Detalhes técnicos'}
 - {id: timeJustNow,                 translation: 'agora mesmo'}
