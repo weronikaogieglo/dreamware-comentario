@@ -1,0 +1,57 @@
+<!-- Info block -->
+<app-info-block>
+    <ng-container i18n>These parameters can be changed on-the-fly.</ng-container>&ngsp;
+    <ng-container i18n>Items marked with <sup class="text-secondary"><fa-icon [icon]="faStarOfLife"/></sup> can also be changed at domain level.</ng-container>
+</app-info-block>
+
+@if (bySection) {
+    <div class="row">
+        <!-- Buttons -->
+        <div class="col-sm-auto order-sm-last pb-3">
+            <div class="d-grid gap-2">
+                <!-- Edit button -->
+                <a routerLink="edit" class="btn btn-secondary">
+                    <fa-icon [icon]="faPencil" class="me-1"/>
+                    <ng-container i18n>Edit</ng-container>
+                </a>
+                <!-- Reset button -->
+                <button [appSpinner]="resetting.active" (confirmed)="reset()"
+                        appConfirm="Are you sure you want to reset the configuration to defaults?"
+                        confirmAction="Reset configuration" confirmActionType="warning"
+                        type="button" class="btn btn-outline-warning w-100 mb-2" i18n-appConfirm i18n-confirmAction>
+                    <fa-icon [icon]="faUndo" class="me-1"/>
+                    <ng-container i18n>Reset to defaults</ng-container>
+                </button>
+            </div>
+        </div>
+
+        <!-- Config items -->
+        <div class="col-sm">
+            <dl class="detail-table dt-50" id="dynamicConfigItems">
+                @for (secItems of bySection | keyvalue; track secItems.key) {
+                    <!-- Section heading -->
+                    <div>
+                        <dt>{{ secItems.key | dynConfigSectionName }}</dt>
+                    </div>
+                    <!-- Section items -->
+                    @for (item of secItems.value; track item.key) {
+                        <div>
+                            <dt class="fw-normal ms-md-3">
+                                <!-- Doc info icon -->
+                                <app-info-icon docLink="configuration/backend/dynamic/{{ item.key | lowercase }}/" class="me-2"/>
+                                <!-- Item name -->
+                                <ng-container>{{ item.key | dynConfigItemName }}</ng-container>
+                                <!-- Overridable icon -->
+                                @if (item.key.startsWith(domainDefaultsPrefix)) {
+                                    <sup class="text-secondary"><fa-icon [icon]="faStarOfLife"/></sup>
+                                }
+                            </dt>
+                            <!-- Item value -->
+                            <dd><app-dyn-config-item-value [item]="item"/></dd>
+                        </div>
+                    }
+                }
+            </dl>
+        </div>
+    </div>
+}

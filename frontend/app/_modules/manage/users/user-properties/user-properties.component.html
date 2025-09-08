@@ -1,0 +1,230 @@
+<!-- Header -->
+<h1 i18n="heading">User properties</h1>
+
+@let u = user();
+@let dus = domainUsers();
+<div [appSpinner]="loading.active" spinnerSize="lg">
+    @if (u) {
+        <div class="row">
+            <!-- Buttons -->
+            <div class="col-md-4 order-md-last pb-3">
+                <!-- Edit user -->
+                <a [class.disabled]="u.systemAccount" routerLink="edit" class="btn btn-secondary w-100 mb-2">
+                    <fa-icon [icon]="faEdit" class="me-1"/>
+                    <ng-container i18n>Edit user</ng-container>
+                </a>
+                <!-- Ban user -->
+                <button [class.active]="u.banned"
+                        [appSpinner]="banning.active" [appConfirm]="u.banned ? unbanConfirm : banConfirm"
+                        [disable]="isSelf() || u.systemAccount!" confirmAction="Proceed" confirmActionType="warning"
+                        (confirmed)="toggleBan()"
+                        type="button" class="btn btn-outline-warning w-100 mb-2" i18n-confirmAction>
+                    <fa-icon [icon]="faBan" class="me-1"/>
+                    @if (u.banned) {
+                        <ng-container i18n>Unban user</ng-container>
+                    } @else {
+                        <ng-container i18n>Ban user</ng-container>
+                    }
+                </button>
+                <!-- Unlock user -->
+                @if (u.isLocked) {
+                    <button [appSpinner]="unlocking.active" (click)="unlock()"
+                            type="button" class="btn btn-outline-success w-100 mb-2">
+                        <fa-icon [icon]="faLockOpen" class="me-1"/>
+                        <ng-container i18n>Unlock user</ng-container>
+                    </button>
+                }
+                <!-- Delete user -->
+                <button [appSpinner]="deleting.active" [appConfirm]="deleteConfirm" [disable]="isSelf() || u.systemAccount!"
+                        confirmAction="Delete user" (confirmed)="delete()" type="button"
+                        class="btn btn-outline-danger w-100 mb-2" i18n-confirmAction>
+                    <fa-icon [icon]="faTrashAlt" class="me-1"/>
+                    <ng-container i18n>Delete user</ng-container>
+                </button>
+            </div>
+
+            <!-- Details -->
+            <div class="col col-md-8">
+                <app-user-details [user]="u" id="user-details"/>
+
+                <!-- Attributes -->
+                @if (userAttrs(); as ua) {
+                    <app-attribute-table [attributes]="ua"/>
+                }
+            </div>
+        </div>
+
+        <!-- Domain roles -->
+        <section id="user-domain-roles">
+            <!-- Heading -->
+            <h2 i18n>Domain roles</h2>
+
+            <!-- Domain/role list -->
+            @if (dus) {
+                <div class="list-group">
+                    @for (du of dus; track du.domainId) {
+                        @if (domains().get(du.domainId!); as d) {
+                            <a @fadeIn-slow [routerLink]="[Paths.manage.domains, d.id]"
+                               class="list-group-item list-group-item-action">
+                                <!-- Domain name/host -->
+                                <div>
+                                    <span class="fw-bold domain-host">{{ d.host }}</span>
+                                    <app-domain-user-role-badge [role]="du.role" class="ms-2"/>
+                                </div>
+                                @if (d.name) {
+                                    <div class="domain-name">{{ d.name }}</div>
+                                }
+                            </a>
+                        }
+                    }
+                </div>
+            }
+
+            <!-- List footer -->
+            <app-list-footer [count]="dus?.length"/>
+        </section>
+
+        <!-- User sessions -->
+        <section [appSpinner]="loadingSessions.active" spinnerSize="lg" id="user-sessions">
+            <div class="row">
+                <div class="col-sm">
+                    <!-- Heading -->
+                    <h2 class="mb-0" i18n>User sessions</h2>
+                    <!-- Info -->
+                    <app-info-block i18n>Expired sessions are cleaned up automatically on a daily basis.</app-info-block>
+                </div>
+
+                <!-- Buttons -->
+                <div class="col-sm-auto d-flex align-items-sm-end">
+                    <!-- Expire all sessions button -->
+                    <button [appSpinner]="expiringSessions.active" [disable]="!userSessions?.length"
+                            (confirmed)="expireSessions()"
+                            appConfirm="Are you sure you want to expire all user's sessions?"
+                            confirmAction="Expire all sessions"
+                            confirmActionType="warning"
+                            type="button" class="btn btn-warning w-100 mb-2" i18n-appConfirm i18n-confirmAction>
+                        <fa-icon [icon]="faCalendarXmark" class="me-1"/>
+                        <ng-container i18n>Expire all sessions</ng-container>
+                    </button>
+                </div>
+            </div>
+
+            <!-- User session list -->
+            @if (userSessions) {
+                <div class="list-group">
+                    @for (us of userSessions; track us.id) {
+                        <div @fadeIn-slow [class.text-dimmed]="isSessionExpired(us)" class="list-group-item">
+                            <!-- 1st line -->
+                            <div>
+                                <!-- Creation time -->
+                                <span class="user-session-created">{{ us.createdTime | datetime }}</span>
+                                <!-- Expiry time -->
+                                <span class="user-session-expires">
+                                    <span class="px-2">·</span>
+                                    <span class="text-info colon me-1" i18n>Expires</span>
+                                    <ng-container>{{ us.expiresTime | datetime }}</ng-container>
+                                </span>
+                                <!-- Expired badge -->
+                                @if (isSessionExpired(us)) {
+                                    <span class="badge bg-secondary ms-2" i18n>Expired</span>
+                                }
+                            </div>
+
+                            <!-- 2nd line -->
+                            <div class="small">
+                                <!-- Host -->
+                                @if (us.host; as v) {
+                                    <span class="user-session-host">
+                                        <span class="text-info colon me-1" i18n>Host</span>
+                                        <ng-container>{{ v }}</ng-container>
+                                    </span>
+                                    <span class="px-2">·</span>
+                                }
+                                <!-- IP and country -->
+                                <span class="user-session-ip-country">
+                                    <span class="text-info colon me-1" i18n>IP</span>
+                                    <ng-container>{{ us.ip }}</ng-container>
+                                    @if (us.country; as v) {&ngsp;({{ v }})}
+                                </span>
+                                <span class="px-2">·</span>
+                                <!-- Protocol -->
+                                <span class="user-session-proto">
+                                    <span class="text-info colon me-1" i18n>Protocol</span>
+                                    <ng-container>{{ us.proto }}</ng-container>
+                                </span>
+                            </div>
+
+                            <!-- 3rd line -->
+                            <div class="small">
+                                <!-- Browser -->
+                                <span class="user-session-browser">
+                                    <span class="text-info colon me-1" i18n>Browser</span>
+                                    <ng-container>{{ us.browserName }} {{ us.browserVersion }}</ng-container>
+                                </span>
+                                <span class="px-2">·</span>
+                                <!-- OS -->
+                                <span class="user-session-os">
+                                    <span class="text-info colon me-1" i18n>OS</span>
+                                    <ng-container>{{ us.osName }} {{ us.osVersion }}</ng-container>
+                                </span>
+                                <span class="px-2">·</span>
+                                <!-- Device -->
+                                <span class="user-session-device">
+                                    <span class="text-info colon me-1" i18n>Device</span>
+                                    <ng-container>{{ us.device }}</ng-container>
+                                </span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- List footer -->
+            <app-list-footer [canLoadMore]="canLoadMoreSessions" [loading]="loadingSessions.active"
+                             [count]="userSessions?.length" (loadMore)="loadSessions(false)"/>
+        </section>
+
+    } @else {
+        <!-- Placeholder when no data -->
+        <app-no-data/>
+    }
+</div>
+
+<!-- Template for the ban confirmation dialog -->
+<ng-template #banConfirm>
+    <p i18n>Are you sure you want to ban this user?</p>
+    <form [formGroup]="banConfirmationForm">
+        <div class="form-check">
+            <input formControlName="deleteComments" type="checkbox" class="form-check-input" id="ban-del-comments">
+            <label class="form-check-label" for="ban-del-comments" i18n>Delete all user's comments</label>
+        </div>
+        <div class="form-check ms-4">
+            <input formControlName="purgeComments" type="checkbox" class="form-check-input" id="ban-purge-comments">
+            <label class="form-check-label" for="ban-purge-comments" i18n>Permanently delete all comments, including replies</label>
+        </div>
+    </form>
+    <hr>
+    <p class="fw-bold" i18n>Please note: comment removal cannot be undone.</p>
+</ng-template>
+
+<!-- Template for the unban confirmation dialog -->
+<ng-template #unbanConfirm>
+    <div i18n>Are you sure you want to unban this user?</div>
+</ng-template>
+
+<!-- Template for the delete user confirmation dialog -->
+<ng-template #deleteConfirm>
+    <p i18n>Are you sure you want to delete this user?</p>
+    <form [formGroup]="deleteConfirmationForm">
+        <div class="form-check">
+            <input formControlName="deleteComments" type="checkbox" class="form-check-input" id="delete-del-comments">
+            <label class="form-check-label" for="delete-del-comments" i18n>Also delete all user's comments</label>
+        </div>
+        <div class="form-check ms-4">
+            <input formControlName="purgeComments" type="checkbox" class="form-check-input" id="delete-purge-comments">
+            <label class="form-check-label" for="delete-purge-comments" i18n>Permanently delete all comments, including replies</label>
+        </div>
+    </form>
+    <hr>
+    <p class="fw-bold" i18n>Please note: this action cannot be undone.</p>
+</ng-template>

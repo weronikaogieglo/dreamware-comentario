@@ -1,0 +1,12 @@
+<!-- Renders a banner about the unstable status on a non-production website -->
+{{- if not hugo.IsProduction -}}
+<div class="bg-warning-subtle p-3 small d-flex align-items-center">
+    <div class="me-2 py-2 ps-2 pe-3 border-warning border-end">
+        <i class="fa-solid fa-2x fa-trowel-bricks"></i>
+    </div>
+    <div class="p-2">
+        This documentation site is about the <strong>unstable</strong> (upcoming) Comentario version.
+        &nbsp;<a href="https://docs.comentario.app/">Switch to the stable version »</a>
+    </div>
+</div>
+{{- end -}}

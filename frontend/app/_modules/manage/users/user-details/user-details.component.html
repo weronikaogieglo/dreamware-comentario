@@ -1,0 +1,193 @@
+@let u = user();
+
+<!-- User avatar, only when there's one -->
+@if (u?.hasAvatar) {
+    <div>
+        <app-user-avatar [user]="u" size="L"/>
+    </div>
+}
+
+<!-- User details -->
+@if (u) {
+    <dl class="detail-table" id="userDetailTable">
+        <!-- ID -->
+        <div>
+            <dt i18n>ID</dt>
+            <dd>
+                <!-- User-linked ID -->
+                @if (userLink()) {
+                    <a [routerLink]="[Paths.manage.users, u.id]" class="internal-link">{{ u.id }}</a>
+                } @else {
+                <!-- Plain-text ID -->
+                    <span appCopyText class="text-copyable">{{ u.id }}</span>
+                }
+                <!-- Current user badge -->
+                <app-current-user-badge [userId]="u.id" badgeClasses="ms-2"/>
+            </dd>
+        </div>
+        <!-- Federated user -->
+        @if (u.federatedSso || u.federatedIdP) {
+            <div>
+                <dt i18n>Federated user</dt>
+                <dd>
+                    <app-idp-icon [sso]="u.federatedSso" [idpId]="u.federatedIdP" class="me-1"/>
+                    @if (u.federatedIdP) {
+                        <ng-container>{{ u.federatedIdP }}/{{ u.federatedId || '*' }}</ng-container>
+                    }
+                </dd>
+            </div>
+        }
+        <!-- Name -->
+        <div>
+            <dt i18n>Name</dt>
+            <dd>{{ u.name }}</dd>
+        </div>
+        <!-- Email -->
+        @if (u.email; as v) {
+            <div>
+                <dt i18n>Email</dt>
+                <dd><span appCopyText class="text-copyable">{{ v }}</span></dd>
+            </div>
+        }
+        <!-- Language -->
+        @if (u.langId; as v) {
+            <div>
+                <dt i18n>Language</dt>
+                <dd>{{ v }}</dd>
+            </div>
+        }
+        <!-- Banned -->
+        @if (u.banned) {
+            <div>
+                <dt i18n>Banned</dt>
+                <dd>
+                    <app-checkmark/>
+                    @if (u.bannedTime; as v) {
+                        <span class="text-dimmed"> ({{ v | datetime }})</span>
+                    }
+                </dd>
+            </div>
+        }
+        <!-- Remarks -->
+        @if (u.remarks; as v) {
+            <div>
+                <dt i18n>Remarks</dt>
+                <dd>{{ v }}</dd>
+            </div>
+        }
+        <!-- Website URL -->
+        @if (u.websiteUrl; as v) {
+            <div>
+                <dt i18n>Website URL</dt>
+                <dd><a [appExternalLink]="v">{{ v }}</a></dd>
+            </div>
+        }
+        <!-- System account -->
+        @if (u.systemAccount) {
+            <div>
+                <dt i18n>System account</dt>
+                <dd><app-checkmark/></dd>
+            </div>
+        }
+        <!-- Confirmed -->
+        @if (u.confirmed) {
+            <div>
+                <dt i18n>Confirmed</dt>
+                <dd>
+                    <app-checkmark/>
+                    @if (u.confirmedTime; as v) {
+                        <span class="text-dimmed"> ({{ v | datetime }})</span>
+                    }
+                </dd>
+            </div>
+        }
+        <!-- Superuser -->
+        @if (u.isSuperuser) {
+            <div>
+                <dt i18n>Superuser</dt>
+                <dd><app-checkmark/></dd>
+            </div>
+        }
+        <!-- Created -->
+        @if (u.createdTime | datetime; as v) {
+            <div>
+                <dt i18n>Created</dt>
+                <dd>{{ v }}</dd>
+            </div>
+        }
+        @if (!u.systemAccount) {
+            <!-- Last password change -->
+            @if (u.passwordChangeTime | datetime; as v) {
+                <div>
+                    <dt i18n>Last password change</dt>
+                    <dd>{{ v }}</dd>
+                </div>
+            }
+            <!-- Last login -->
+            <div>
+                <dt i18n>Last login</dt>
+                <dd>
+                    @if (u.lastLoginTime | datetime; as v) {
+                        <ng-container>{{ v }}</ng-container>
+                    } @else {
+                        <em i18n>(never)</em>
+                    }
+                </dd>
+            </div>
+            <!-- Last failed login -->
+            @if (u.lastFailedLoginTime | datetime; as v) {
+                <div>
+                    <dt i18n>Last failed login</dt>
+                    <dd>{{ v }}</dd>
+                </div>
+            }
+            <!-- Failed login attempts -->
+            @if (u.failedLoginAttempts; as v) {
+                <div>
+                    <dt i18n>Failed login attempts</dt>
+                    <dd>{{ v | number }}</dd>
+                </div>
+            }
+            <!-- Locked -->
+            @if (u.isLocked) {
+                <div>
+                    <dt i18n>Locked</dt>
+                    <dd>
+                        <app-checkmark/>
+                        @if (u.lockedTime; as v) {
+                            <span class="text-dimmed"> ({{ v | datetime }})</span>
+                        }
+                    </dd>
+                </div>
+            }
+            <!-- Signup IP -->
+            @if (u.signupIP; as v) {
+                <div>
+                    <dt i18n>Signup IP</dt>
+                    <dd><span appCopyText class="text-copyable">{{ v }}</span></dd>
+                </div>
+            }
+            <!-- Signup country -->
+            @if (u.signupCountry; as v) {
+                <div>
+                    <dt i18n>Signup country</dt>
+                    <dd>{{ v }} — {{ v | countryName }}</dd>
+                </div>
+            }
+            <!-- Signup host -->
+            @if (u.signupHost; as v) {
+                <div>
+                    <dt i18n>Signup host</dt>
+                    <dd>{{ v }}</dd>
+                </div>
+            }
+            <!-- Number of owned domains -->
+            @if (u.countDomainsOwned; as v) {
+                <div>
+                    <dt i18n>Number of owned domains</dt>
+                    <dd>{{ v | number }}</dd>
+                </div>
+            }
+        }
+    </dl>
+}

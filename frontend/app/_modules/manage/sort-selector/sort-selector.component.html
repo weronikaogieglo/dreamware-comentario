@@ -1,0 +1,32 @@
+<div ngbDropdown class="d-inline-block" placement="bottom-end">
+    @let prop = sort().property;
+    @let desc = sort().descending;
+
+    <!-- Dropdown toggle -->
+    <button [class.sort-asc]="!desc" [class.sort-desc]="desc"
+            type="button" class="btn btn-outline-secondary" id="sortByDropdown" title="Sort" ngbDropdownToggle i18n-title>
+        @if (itemTitle; as s) {
+            <fa-icon [icon]="itemIcon" class="me-1"/>
+            <ng-container>{{ s }}</ng-container>
+        } @else {
+            <ng-container i18n>Sort</ng-container>
+        }
+    </button>
+
+    <!-- Sort buttons -->
+    <div ngbDropdownMenu aria-labelledby="sortByDropdown">
+        <div class="p-3 flex-column flex-md-row btn-group text-nowrap" role="group">
+            @for (p of items; track p.by()) {
+                @let curr = prop === p.by();
+                <button [class.active]="curr" [class.sort-asc]="curr && !desc" [class.sort-desc]="curr && desc"
+                        [attr.aria-checked]="curr" [attr.id]="p.id()" (click)="applyProperty(p)"
+                        class="btn btn-outline-secondary" type="button">
+                    @if (curr) {
+                        <fa-icon [icon]="itemIcon" class="me-1"/>
+                    }
+                    <ng-container>{{ p.label() }}</ng-container>
+                </button>
+            }
+        </div>
+    </div>
+</div>

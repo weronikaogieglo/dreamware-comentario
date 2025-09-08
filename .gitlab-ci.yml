@@ -1,0 +1,482 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        VERSION: "$CI_COMMIT_TAG"
+        PUSH_IMAGE: "true"
+        ENV_HOST: comentario.app
+        HELM_CHANNEL: stable
+
+    - if: $CI_COMMIT_BRANCH == "dev"
+      variables:
+        VERSION: "$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA"
+        PUSH_IMAGE: "true"
+        ENV_HOST: edge.comentario.app
+        HELM_CHANNEL: edge
+
+    - if: $CI_COMMIT_SHORT_SHA
+      variables:
+        VERSION: "$CI_COMMIT_SHORT_SHA"
+
+stages:
+  - build
+  - test
+  - package
+  - release
+  - deploy
+  - post-deploy
+
+variables:
+  CI_TOOLS_VERSION: "v48"
+  DEPLOYER_IMAGE: "alpine/k8s:1.31.5"
+  # Namespace to deploy Kubernetes objects into
+  NAMESPACE: ys-comentario
+  PUSH_IMAGE: "false"
+  ENV_HOST: ""
+  HELM_CHANNEL: ""
+  SKIP_TESTS:
+    value: "false"
+    description: Whether to skip executing front-end tests
+    options:
+      - "false"
+      - "true"
+  SKIP_DEPLOY:
+    value: "false"
+    description: Whether to skip deployment
+    options:
+      - "false"
+      - "true"
+
+build:
+  stage: build
+  image: registry.gitlab.com/comentario/comentario-ci-tools/builder:$CI_TOOLS_VERSION
+  artifacts:
+    when: always
+    name: comentario
+    expire_in: 1 days  # Only keep the last batch
+    paths:
+      - build/
+      - dist/
+      - node_modules/
+  variables:
+    # We want to store downloaded packages under the project dir, so we can cache them
+    GOPATH: $CI_PROJECT_DIR/.go
+  cache:
+    key:
+      files:
+        # Backend
+        - go.mod
+        # Frontend
+        - yarn.lock
+    paths:
+      # Backend
+      - .go/pkg/mod/
+      # Frontend
+      - .yarn-cache/
+  before_script:
+    # Create the required dirs
+    - mkdir -p build .go
+  script:
+    # Backend build
+    - go generate               # Generate code
+    - go mod download           # Fetch the dependencies explicitly (not exactly necessary, but makes it easier to spot problems)
+    - test -z "$(go fmt ./...)" # Make sure there are no formatting issues
+    - go vet ./...              # Look for code quirks
+    - go test -v ./...          # Run unit tests
+
+    # Frontend build
+    - yarn install 
+        --frozen-lockfile 
+        --no-progress 
+        --cache-folder .yarn-cache    # Fetch the dependencies
+    - yarn run generate               # Generate the API client
+    - yarn run lint                   # Lint
+    - yarn run test:ci                # Run unit tests
+    - yarn run build:prod             # Build
+
+    # Debug output
+    - git status -v
+
+    # Build source and binary packages using goreleaser
+    - goreleaser_opts='--clean --skip=publish'
+    - if [[ -z "$CI_COMMIT_TAG" ]]; then
+    -     goreleaser_opts="$goreleaser_opts --snapshot"
+    - fi
+    - goreleaser release $goreleaser_opts
+
+    # Remove arch version from dir name
+    - mv dist/comentario_linux_amd64_v1 dist/comentario_linux_amd64
+    - mv dist/comentario_linux_arm64_v8.0 dist/comentario_linux_arm64
+    - mv dist/comentario-static_linux_amd64_v1 dist/comentario-static_linux_amd64
+    - mv dist/comentario-static_linux_arm64_v8.0 dist/comentario-static_linux_arm64
+
+    # Build the e2e plugin and relay, placing them next to the Linux AMD64 binary
+    - go build -buildmode=plugin -o "./dist/comentario_linux_amd64/comentario-e2e.so" "./e2e/plugin/"
+    - go build -v -o "./dist/comentario_linux_amd64/comentario-relay" "./e2e/relay/"
+
+# Base definition of an e2e-test job. Requires the variable $SECRETS_FILE to be set
+.e2e:
+  stage: test
+  rules:
+    - if: $SKIP_TESTS != 'true'
+  image: registry.gitlab.com/comentario/comentario-ci-tools/builder:$CI_TOOLS_VERSION
+  artifacts:
+    when: always
+    name: comentario
+    expire_in: 30 days
+    paths:
+      - cypress/reports
+      - cypress/screenshots
+      - cypress/videos
+      - tmp/logs
+  services:
+    # The test-site service. Its host (alias) must match the one passed to comentario-relay
+    - name: registry.gitlab.com/comentario/comentario-ci-tools/test-site:$CI_TOOLS_VERSION
+      alias: comentario-test-site
+  dependencies:
+    - build
+  before_script:
+    # Create the required dirs
+    - mkdir -p tmp/logs
+  script:
+    # Wait for HTTP server using the given URL
+    - |
+      waitFor() {
+          i=0
+          while ((i++ < 30)); do
+              curl --max-time 2 -vs "$1" >/dev/null && break
+              sleep 1
+          done
+          if [[ $i -ge 30 ]]; then
+              echo "ERROR: $1 is not reachable after $i seconds, failing"
+              exit 1
+          fi 
+      }
+
+    # Start the e2e backend
+    - ./dist/comentario_linux_amd64/comentario -vv
+          --no-color
+          --e2e
+          --port=8080
+          --static-path=build/frontend
+          --db-migration-path=db
+          --template-path=templates
+          --secrets=$SECRETS_FILE
+          --base-docs-url="https://edge.docs.comentario.app"
+          --home-content-url="https://edge.docs.comentario.app/en/embed/front-page/"
+          &> ./tmp/logs/comentario-server.log &
+    - waitFor http://localhost:8080/en/
+
+    # Let all database cleaners finish their first run
+    - sleep 10
+
+    # Start the relay to pass localhost:8000 requests through to comentario-test-site:80
+    - ./dist/comentario_linux_amd64/comentario-relay 
+          -listen 127.0.0.1:8000
+          -target http://comentario-test-site
+          &> ./tmp/logs/comentario-relay.log &
+    - waitFor http://localhost:8000/comments/
+
+     # Run e2e tests
+    - npx cypress install
+    - npx cypress run
+
+e2e-postgres:
+  extends: .e2e
+  parallel:
+    # Test against all supported PostgreSQL versions
+    matrix:
+      - POSTGRES_VERSION:
+          - 17-alpine
+          - 16-alpine
+          - 15-alpine
+          - 14-alpine
+          - 13-alpine
+          - 12-alpine
+          - 11-alpine
+          - 10-alpine
+  variables:
+    SECRETS_FILE: resources/k8s/secrets.postgres.yaml
+  services:
+    # The PostgreSQL database of the specified version
+    - name: postgres:$POSTGRES_VERSION
+      variables:
+        POSTGRES_DB: comentario
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+    # The test-site service. Its host (alias) must match the one passed to comentario-relay
+    - name: registry.gitlab.com/comentario/comentario-ci-tools/test-site:$CI_TOOLS_VERSION
+      alias: comentario-test-site
+
+e2e-sqlite3:
+  extends: .e2e
+  variables:
+    SECRETS_FILE: resources/k8s/secrets.sqlite3.yaml
+
+docker-image:
+  stage: package
+  image: docker
+  services:
+    - docker:dind
+  dependencies:
+    - build
+  parallel:
+    matrix:
+      - FLAVOUR:
+        - -alpine
+        - -ubuntu
+  variables:
+    IMG_TAG_CURRENT: $CI_REGISTRY_IMAGE:$VERSION
+    IMG_TAG_LATEST:  $CI_REGISTRY_IMAGE:latest
+    IMG_TAG_EDGE:    $CI_REGISTRY_IMAGE:edge
+  script:
+    # Determine the suffix: it will be empty for Alpine
+    - suffix="${FLAVOUR#-alpine}"
+    - echo "Using image suffix '$suffix'"
+
+    # Create a multi-arch environment
+    - docker buildx create --driver docker-container --name multi-arch --use
+
+    # Login to the Container Registry
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+    # Build and optionally push the images
+    - |
+      args="--platform linux/amd64,linux/arm64 -f Dockerfile$suffix"
+      if [[ $PUSH_IMAGE == 'true' ]]; then
+          # Build and push the "main" image tag
+          args="$args --push -t $IMG_TAG_CURRENT$suffix"
+
+          # For a tag, also push it as 'latest'
+          [[ -n "$CI_COMMIT_TAG" ]] && args="$args -t $IMG_TAG_LATEST$suffix"
+    
+          # For dev, also push it as 'edge'
+          [[ "$CI_COMMIT_BRANCH" == "dev" ]] && args="$args -t $IMG_TAG_EDGE$suffix"
+      fi
+      echo "Building and pushing docker images"
+      echo "Arguments: '$args'"
+      docker buildx build $args .
+
+helm-chart:
+  stage: package
+  image: $DEPLOYER_IMAGE
+  dependencies: []
+  script:
+    # Lint the chart
+    - helm lint --strict resources/helm/comentario
+
+    # Extract version from the chart
+    - CHART_VERSION="$(helm show chart resources/helm/comentario | grep -E '^version:' | cut -d ' ' -f 2)"
+
+    # Package the chart into a tarball
+    - helm package resources/helm/comentario
+
+    # If there's a channel specified, publish the package into the Helm repository
+    - |
+      if [[ -n "$HELM_CHANNEL" ]]; then
+          curl \
+            --fail-with-body \
+            --request POST \
+            --user gitlab-ci-token:$CI_JOB_TOKEN \
+            --form "chart=@comentario-$CHART_VERSION.tgz" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/helm/api/$HELM_CHANNEL/charts"
+      fi
+
+# Verify the .deb package
+verify-package-deb:
+  stage: package
+  image: ubuntu:22.04
+  dependencies:
+    - build
+  before_script:
+    # Install systemd to fulfill the requirements, and jq to query artifacts
+    - apt-get update
+    - apt-get install -y systemd jq
+  script:
+    # Install the package
+    - pkg_name="$(jq -r '.[] | select(.goos == "linux" and .goarch == "amd64" and .extra.Ext == ".deb") | .path' dist/artifacts.json)"
+    - '[[ -z "$pkg_name" ]] && echo "Failed to find the .deb package" && exit 1'
+    - dpkg -i "$pkg_name"
+
+    # We won't really start the service because it's way too much hassle to get systemd operational inside a container.
+    # For now, an installable package is good enough
+    - test -s /etc/comentario/comentario.conf
+    - test -s /etc/comentario/secrets.yaml
+    - test -x /usr/bin/comentario
+    - test -d /usr/lib/comentario/db
+    - test -s /usr/lib/comentario/frontend/comentario.css
+    - test -s /usr/lib/comentario/frontend/comentario.js
+    - test -s /usr/lib/comentario/frontend/favicon.ico
+    - test -s /usr/lib/comentario/frontend/en/index.html
+    - test -d /usr/lib/comentario/templates
+    - test -s /usr/lib/systemd/system/comentario.service
+
+# Verify the .rpm package
+verify-package-rpm:
+  stage: package
+  image: redhat/ubi9
+  dependencies:
+    - build
+  before_script:
+    # Install jq to query artifacts
+    - yum install -y jq
+  script:
+    # Install the package
+    - pkg_name="$(jq -r '.[] | select(.goos == "linux" and .goarch == "amd64" and .extra.Ext == ".rpm") | .path' dist/artifacts.json)"
+    - '[[ -z "$pkg_name" ]] && echo "Failed to find the .rpm package" && exit 1'
+    - rpm -i "$pkg_name"
+
+    # We won't really start the service because it's way too much hassle to get systemd operational inside a container.
+    # For now, an installable package is good enough
+    - test -s /etc/comentario/comentario.conf
+    - test -s /etc/comentario/secrets.yaml
+    - test -x /usr/bin/comentario
+    - test -d /usr/lib/comentario/db
+    - test -s /usr/lib/comentario/frontend/comentario.css
+    - test -s /usr/lib/comentario/frontend/comentario.js
+    - test -s /usr/lib/comentario/frontend/favicon.ico
+    - test -s /usr/lib/comentario/frontend/en/index.html
+    - test -d /usr/lib/comentario/templates
+    - test -s /usr/lib/systemd/system/comentario.service
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    # Only run in the main repo, and if it's a tag build
+    - if: $CI_PROJECT_NAMESPACE == 'comentario' && $CI_COMMIT_TAG
+  before_script:
+    # Install curl, jq
+    - apk add --no-cache curl jq
+  script:
+    # Strip the 'v' prefix from the version number
+    - ver_num="${VERSION#v}"
+    - package_registry_url="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/comentario/$ver_num"
+
+    # Upload the packages
+    - |
+      jq -r '.[] | select(.type != "Binary") | .path' dist/artifacts.json | 
+          while read artifact; do
+              echo "Uploading artifact $artifact to $package_registry_url"
+              curl -fsS \
+                  --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+                  --upload-file "$artifact" "$package_registry_url/$(basename "$artifact")"
+          done
+
+    # Extract the release text from CHANGELOG.md
+    - awk "/^##\s+$VERSION/{flag=1; next} /^##\s+/{flag=0} flag" CHANGELOG.md > release-text
+    - |
+      if [[ ! -s release-text ]]; then
+          echo "Failed to extract release text for $VERSION from CHANGELOG.md"
+          exit 1
+      fi
+
+    # Create a release
+    - |
+      echo "Creating release $CI_COMMIT_TAG"
+      assets="$(jq -r --arg URL "$package_registry_url" '[.[] | select(.type != "Binary") | {name, url: "\($URL)/\(.name)"}]' dist/artifacts.json)"
+      echo "Publishing assets:"
+      echo "$assets"
+      release-cli create \
+          --name "$CI_COMMIT_TAG" \
+          --tag-name "$CI_COMMIT_TAG" \
+          --description release-text \
+          --assets-link "$assets"
+
+# Deploy the dev branch to edge.comentario.app
+deploy-dev:
+  stage: deploy
+  rules:
+    - if: $SKIP_DEPLOY == 'true'
+      when: never
+    # Only run if the context name is given (via CI/CD vars) and the branch is 'dev'
+    - if: $CV_K8S_CONTEXT && $CI_COMMIT_BRANCH == "dev"
+  image: $DEPLOYER_IMAGE
+  environment:
+    name: $ENV_HOST
+  script:
+    # Use the Kubernetes context from GitLab agent
+    - kubectl config use-context $CV_K8S_CONTEXT
+
+    # Perform chart installation/upgrade, waiting for it to complete (up to two minutes)
+    - helm upgrade
+        --namespace $NAMESPACE
+        --install
+        --set "clusterIssuer=letsencrypt-prod"
+        --set "image.repository=$CI_REGISTRY_IMAGE"
+        --set "image.tag=$VERSION"
+        --set "comentario.baseDocsUrl=https://edge.docs.comentario.app/"
+        --set "comentario.homeContentURL=https://edge.docs.comentario.app/en/embed/edge-front-page/"
+        --set "comentario.emailFrom=noreply@comentario.app"
+        --set "comentario.secretName=comentario-edge-secrets"
+        --set "ingress.host=$ENV_HOST"
+        --wait
+        --timeout 2m
+        comentario-edge
+        resources/helm/comentario
+
+    # Deploy the recreate demo DB cronjob
+    - helm upgrade
+        --namespace $NAMESPACE
+        --install
+        --set "database.secretName=comentario-edge-secrets"
+        --wait
+        --timeout 1m
+        comentario-demo-recreate-db
+        resources/helm/demo-recreate-db
+
+    # Trigger the job right away
+    - kubectl create job
+        --namespace $NAMESPACE
+        --from=cronjob/comentario-demo-recreate-db-cronjob
+        comentario-demo-recreate-db-cronjob-$(date +%s)
+
+# Allow manual deployment of any tag to production
+deploy-tag:
+  stage: deploy
+  rules:
+    - if: $SKIP_DEPLOY == 'true'
+      when: never
+    # Only run if the context name is given (via CI/CD vars) and it's a tag build (manual deployment only)
+    - if: $CV_K8S_CONTEXT && $CI_COMMIT_TAG
+      when: manual
+  image: $DEPLOYER_IMAGE
+  environment:
+    name: $ENV_HOST
+  script:
+    # Use the Kubernetes context from GitLab agent
+    - kubectl config use-context $CV_K8S_CONTEXT
+
+    # Perform chart installation/upgrade, waiting for it to complete (up to two minutes)
+    - helm upgrade
+        --namespace $NAMESPACE
+        --install
+        --set "clusterIssuer=letsencrypt-prod"
+        --set "image.repository=$CI_REGISTRY_IMAGE"
+        --set "image.tag=$VERSION"
+        --set "comentario.emailFrom=noreply@comentario.app"
+        --set "comentario.secretName=comentario-app-secrets"
+        --set "ingress.host=$ENV_HOST"
+        --wait
+        --timeout 2m
+        comentario-app
+        resources/helm/comentario
+
+smoke-test:
+  stage: post-deploy
+  rules:
+    # Only makes sense if deploy has run
+    - if: $CV_K8S_CONTEXT && $CI_COMMIT_BRANCH == "dev"
+    - if: $CV_K8S_CONTEXT && $CI_COMMIT_TAG
+  image: curlimages/curl:latest
+  dependencies: []  # Do not download any artifacts
+  script:
+    # Check function. Synopsis: checkRedirect <URL> <Expected Location>
+    - |
+      checkRedirect() {
+          curl -fisS "$1" | grep -i 'Location:' | tr -d '\r' | cut -d ' ' -f 2 | grep -Fx "$2"
+      }
+
+    # Check basic redirections
+    - checkRedirect http://$ENV_HOST/  https://$ENV_HOST/
+    - checkRedirect https://$ENV_HOST/ /en/

@@ -1,0 +1,44 @@
+# Build output
+/build/
+/build-e2e/
+/dist/
+
+# Generated code
+/internal/api/models/*.go
+/internal/api/restapi/operations/
+/internal/api/restapi/doc.go
+/internal/api/restapi/embedded_spec.go
+/internal/api/restapi/server.go
+/frontend/generated-api
+
+# Front-end dependencies
+node_modules/
+
+# Caches
+.yarn/
+.angular/
+/docs/resources/
+
+# Test artifacts
+/cypress/downloads
+/cypress/reports
+/cypress/screenshots
+/cypress/videos
+
+# IDE
+/.idea/
+
+# CI pipeline
+/.go/
+
+# Locally kept files
+~*
+
+# Misc
+.yarnrc.yml
+.hugo_build.lock
+
+cmd/
+models/
+
+comentario_server.go

@@ -1,0 +1,94 @@
+<!-- Heading -->
+@if (isNew) {
+    <h1 i18n="heading">Create domain</h1>
+    <div class="mb-3" i18n>Add a domain to enable comments on it.</div>
+} @else {
+    <h1 i18n="heading">Edit domain</h1>
+}
+
+<!-- Edit form -->
+@if (form) {
+    <form [formGroup]="form" [appSpinner]="loading.active" (ngSubmit)="submit()" (keydown.control.enter)="submit()" spinnerSize="lg">
+        <fieldset [disabled]="loading.active || saving.active">
+            <!-- Tabs -->
+            <ul ngbNav #nav="ngbNav" class="nav-tabs ps-3 mb-3">
+                <!-- General properties -->
+                <li ngbNavItem formGroupName="general">
+                    <button ngbNavLink [class.is-invalid]="ctlGroupGeneral.invalid || ctlGroupConfig.invalid" class="fw-bold" i18n>General</button>
+                    <ng-template ngbNavContent>
+                        <app-domain-edit-general [generalFormGroup]="ctlGroupGeneral"
+                                                 [configFormGroup]="ctlGroupConfig"
+                                                 [config]="config"
+                                                 [isNew]="isNew"/>
+                    </ng-template>
+                </li>
+
+                <!-- Authentication -->
+                <li ngbNavItem formGroupName="auth">
+                    <button ngbNavLink [appValidatable]="ctlGroupAuth" [validateUntouched]="true">
+                        <!-- Tab title -->
+                        <span class="fw-bold me-1" i18n>Authentication</span>
+                        <!-- Badge with a number -->
+                        @if (numAuths; as n) {
+                            <span class="badge bg-success">{{ n }}</span>
+                        } @else {
+                            <span class="badge bg-warning">0</span>
+                        }
+                    </button>
+                    <ng-template ngbNavContent>
+                        <!-- No available auth method warning -->
+                        @if (!numAuths) {
+                            <div class="alert alert-warning">
+                                <fa-icon [icon]="faExclamationTriangle" class="me-1"/>
+                                <ng-container i18n>No authentication method enabled, your users won't be able to comment.</ng-container>
+                            </div>
+                        }
+                        <!-- Auth properties -->
+                        <app-domain-edit-auth [configFormGroup]="$any(ctlGroupConfig.controls.auth)"
+                                              [methodsFormGroup]="ctlGroupAuth"
+                                              [config]="config"
+                                              [federatedIdps]="fedIdps"/>
+                    </ng-template>
+                </li>
+
+                <!-- Moderation -->
+                <li ngbNavItem formGroupName="mod">
+                    <button ngbNavLink [appValidatable]="ctlGroupMod" [validateUntouched]="true" class="fw-bold" i18n>Moderation</button>
+                    <ng-template ngbNavContent>
+                        <app-domain-edit-moderation [formGroup]="ctlGroupMod"/>
+                    </ng-template>
+                </li>
+
+                <!-- Extensions -->
+                <li ngbNavItem formGroupName="extensions">
+                    <button ngbNavLink [appValidatable]="ctlGroupExtensions" [validateUntouched]="true">
+                        <!-- Tab title -->
+                        <span class="fw-bold me-1" i18n>Extensions</span>
+                        <!-- Badge with a number -->
+                        @if (numExtensions; as n) {
+                            <span class="badge bg-secondary">{{ n }}</span>
+                        }
+                    </button>
+                    <ng-template ngbNavContent>
+                        <app-domain-edit-extensions [formGroup]="ctlGroupExtensions" [extensions]="extensions"/>
+                    </ng-template>
+                </li>
+            </ul>
+
+            <!-- Tab content -->
+            <div [ngbNavOutlet]="nav"></div>
+
+            <!-- Buttons -->
+            <div class="form-footer">
+                <a routerLink=".." class="btn btn-link" i18n="action">Cancel</a>
+                <button [appSpinner]="saving.active" type="submit" class="btn btn-primary">
+                    @if (isNew) {
+                        <ng-container i18n="action">Create</ng-container>
+                    } @else {
+                        <ng-container i18n="action">Save</ng-container>
+                    }
+                </button>
+            </div>
+        </fieldset>
+    </form>
+}

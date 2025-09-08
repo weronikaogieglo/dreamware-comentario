@@ -1,0 +1,72 @@
+@let meta = domainMeta();
+@let dp = page();
+
+<!-- Header -->
+<header class="mb-3">
+    <h1 i18n="heading">Domain page properties</h1>
+</header>
+
+<!-- Properties -->
+<div [appSpinner]="loading.active" spinnerSize="lg">
+    @if (meta && dp) {
+        <div class="row">
+            <!-- Buttons: only for moderator+ -->
+            @if (meta.canModerateDomain) {
+                <div class="col-md-4 order-md-last pb-3">
+                    <!-- Edit -->
+                    <a routerLink="edit" class="btn btn-secondary w-100 mb-2">
+                        <fa-icon [icon]="faEdit" class="me-1"/>
+                        <ng-container i18n>Edit</ng-container>
+                    </a>
+                    @if (meta.canManageDomain) {
+                        <!-- Update title -->
+                        <button [appSpinner]="updatingTitle.active" (click)="updateTitle()"
+                                type="button" class="btn btn-outline-secondary w-100 mb-2">
+                            <fa-icon [icon]="faRotate" class="me-1"/>
+                            <ng-container i18n>Update title</ng-container>
+                        </button>
+                        <!-- Move data -->
+                        <a routerLink="move" class="btn btn-outline-secondary w-100 mb-2">
+                            <fa-icon [icon]="faBoxesPacking" class="me-1"/>
+                            <ng-container i18n>Move data</ng-container>
+                        </a>
+                        <!-- Delete -->
+                        <button [appSpinner]="deleting.active"
+                                [appConfirm]="deleteConfirm"
+                                confirmAction="Delete domain page"
+                                (confirmed)="delete()"
+                                type="button" class="btn btn-outline-danger w-100 mb-2"
+                                i18n-confirmAction>
+                            <fa-icon [icon]="faTrashAlt" class="me-1"/>
+                            <ng-container i18n>Delete</ng-container>
+                        </button>
+                    }
+                </div>
+            }
+
+            <!-- Detail table -->
+            <div class="col col-md-8">
+                <app-domain-page-details [page]="dp"/>
+            </div>
+        </div>
+
+        <!-- Comments -->
+        <section>
+            <!-- Heading -->
+            <h2 i18n>Comments</h2>
+            <!-- Comment list -->
+            <app-comment-list [pageId]="dp.id"/>
+        </section>
+    }
+
+    <!-- Placeholder when no data -->
+    @if (!meta?.domain || !dp) { <app-no-data/> }
+</div>
+
+<!-- Delete confirmation template -->
+<ng-template #deleteConfirm>
+    <p i18n>Are you sure you want to delete this domain page?</p>
+    <p i18n>This will also delete all its comments and view statistics.</p>
+    <hr>
+    <p class="fw-bold" i18n>Please note: this action cannot be undone.</p>
+</ng-template>

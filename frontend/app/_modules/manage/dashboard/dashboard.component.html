@@ -1,0 +1,106 @@
+<!-- Heading -->
+<h1 i18n="heading">Dashboard</h1>
+
+<ng-template [appLoader]="loading.active" loaderKind="cards">
+    @if (totals) {
+        <!-- Counters -->
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-2" id="dashboard-totals">
+            <!-- Users -->
+            @if (totals.countUsersTotal >= 0) {
+                <app-metric-card [value]="totals.countUsersTotal" [fullHeight]="true"
+                                 label="Users" sublabel="total" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Domains -->
+            @if (totals.countDomainsOwned; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Domains" sublabel="you own" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+            @if (totals.countDomainsModerated; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Domains" sublabel="you moderate" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+            @if (totals.countDomainsCommenter; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Domains" sublabel="you're commenter on" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+            @if (totals.countDomainsReadonly; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Domains" sublabel="you're read-only on" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Pages moderated -->
+            @if (totals.countPagesModerated; as c) {
+                <app-metric-card [value]="c" [chartCounts]="domainPageCounts" [fullHeight]="true"
+                                 label="Pages" sublabel="you moderate" chartColour="#fd4f8850" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Pages commented on -->
+            @if (totals.countPagesCommented; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Pages" sublabel="you commented on" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Domain users -->
+            @if (totals.countDomainUsers; as c) {
+                <app-metric-card [value]="c" [chartCounts]="domainUserCounts" [fullHeight]="true"
+                                 label="Domain users" sublabel="you manage" chartColour="#e3a41c50" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Comments total -->
+            @if (totals.countComments; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Comments" sublabel="total" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Comments authored -->
+            @if (totals.countOwnComments; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Comments" sublabel="you authored" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+
+            <!-- Commenters -->
+            @if (totals.countCommenters; as c) {
+                <app-metric-card [value]="c" [fullHeight]="true"
+                                 label="Commenters" sublabel="total" i18n-label="metric-label|" i18n-sublabel="metric-sublabel|"/>
+            }
+        </div>
+
+        <!-- Stats charts, only if it's a superuser or there are any owned domains -->
+        @if (principal()?.isSuperuser || totals.countDomainsOwned) {
+            <app-stats domainId=""/>
+        }
+    }
+
+    <!-- Welcome message when no data -->
+    @if (hasData === false) {
+        <div class="d-flex flex-column justify-content-center align-items-center">
+            <h2 class="text-center heading-separator" i18n>Welcome to Comentario Dashboard!</h2>
+            <p class="text-center" i18n>This application allows you to navigate domains, pages, and comments you authored.</p>
+
+            <!-- Steps in case the user can add a domain -->
+            @if (canAddDomain === true) {
+                <p class="text-center lead fw-bold fade-in-1s" i18n>Do you want to connect Comentario to your website?</p>
+                <ol class="fade-in-3s list-motley">
+                    <li>
+                        <div class="marker bg-motley-1">1</div>
+                        <div i18n><a [routerLink]="Paths.manage.domainCreate">Add its domain</a> to Comentario in the Domain Manager.</div>
+                    </li>
+                    <li>
+                        <div class="marker bg-motley-2">2</div>
+                        <div i18n>Install Comentario snippet on your website.</div>
+                    </li>
+                    <li>
+                        <div class="marker bg-motley-3">3</div>
+                        <div i18n>Engage in discussions with your visitors!</div>
+                    </li>
+                </ol>
+
+            <!-- Explanation in case they can't -->
+            } @else {
+                <p class="text-center fade-in-1s" i18n>Since you've not written a single comment yet, it's a bit empty in here.</p>
+                <p class="text-center fade-in-2s" i18n>As soon as there's more data available, this page should prove more useful!</p>
+            }
+        </div>
+    }
+</ng-template>

@@ -1,0 +1,79 @@
+@use "sass:color";
+
+// Fonts
+$font-family-sans-serif: Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+$font-size-base:         0.9375rem; // Use 15px font by default (instead of 1rem = 16px)
+$headings-font-family:   Volkhov, serif;
+
+// Theme palette
+$primary:   #4950d8;
+$secondary: color.adjust($primary, $saturation: -25%, $lightness: +16%);
+$success:   #198754;
+$info:      #6610f2;
+$warning:   #e8b006;
+$danger:    #dc3545;
+$light:     #ffffff;
+$dark:      #212529;
+// -- Theme palette custom extensions
+$cta:       #ec8100;
+
+// Custom vars
+$navbar-bg-color: color.adjust($primary, $saturation: - 33%, $lightness: +36%);
+$sidebar-bg-color: $navbar-bg-color;
+$footer-bg-color: color.adjust($primary, $saturation: -33%, $lightness: +25%);
+
+// Extend the (default) theme color with the cta color
+$theme-colors: (
+    "primary":   $primary,
+    "secondary": $secondary,
+    "success":   $success,
+    "info":      $info,
+    "warning":   $warning,
+    "danger":    $danger,
+    "light":     $light,
+    "dark":      $dark,
+
+    // Custom colours
+    "cta":       $cta,
+);
+$social-colors: (
+    "facebook": #1877f2,
+    "github":   #000000,
+    "gitlab":   #fc6d26,
+    "google":   #4285f4,
+    "twitter":  #1da1f2,
+);
+
+// Standard color overrides
+$input-placeholder-color:       #bcbcbc; // Make it a bit lighter
+$toast-header-color:            #fff;
+$toast-header-background-color: transparent;
+$toast-box-shadow:              0 .25rem 3rem rgba(#000, .3);
+$code-color:                    $info;
+$placeholder-opacity-max:       0.25;
+
+// Remove underlining from all links
+$link-decoration: none;
+
+// Bootstrap var overrides
+$enable-shadows:   true;
+$navbar-padding-x: 0.5rem;
+$navbar-padding-y: 0.5rem;
+$border-radius:    0.15rem;
+$btn-box-shadow:   0 0.25rem 0.375rem rgba(50, 50, 93, .11), 0 0.0625rem 0.1875rem rgba(0, 0, 0, .08);
+
+// Import Bootstrap functions and mixins
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/variables-dark";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/utilities";
+
+// Properties
+:root {
+    --app-sidebar-bg-color: #{$sidebar-bg-color};
+    --app-sidebar-color:    #0000007f;
+    --app-navbar-bg-color:  #{$navbar-bg-color};
+    --app-footer-bg-color:  #{$footer-bg-color};
+}

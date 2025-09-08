@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: comentario
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      # Transient data volume
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+
+  http:
+    image: registry.gitlab.com/comentario/comentario-ci-tools/test-site:v48
+    ports:
+      - '8000:80'

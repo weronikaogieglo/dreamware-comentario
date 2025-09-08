@@ -1,0 +1,47 @@
+:host {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-backdrop {
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+
+    &.avatar-anonymous {
+        color: #fff;
+        background-color: #000;
+        opacity: 0.33;
+    }
+
+    &.avatar-initial {
+        color: #fff;
+    }
+
+    &.size-s {
+        width: 16px;
+        height: 16px;
+        font-size: 12px;
+    }
+
+    &.size-m {
+        width: 32px;
+        height: 32px;
+        font-size: 20px;
+    }
+
+    &.size-l {
+        width: 128px;
+        height: 128px;
+        font-size: 96px;
+    }
+}
+
+img {
+    width: 100%;
+    height: auto;
+}

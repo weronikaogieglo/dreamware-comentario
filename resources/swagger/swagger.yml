@@ -1,0 +1,4233 @@
+info:
+  title: Comentario
+  version: 1.0.0
+consumes:
+  - application/json
+produces:
+  - application/json
+schemes:
+  - http
+swagger: "2.0"
+basePath: /api
+
+securityDefinitions:
+  # Header authentication for commenters (used by the embed part)
+  userSessionHeader:
+    type: apiKey
+    in: header
+    name: X-User-Session
+
+  # Cookie authentication for users (used by the frontend part). Uses the apiKey type for the lack of a proper
+  # cookie-based authentication in Swagger 2
+  userCookie:
+    type: apiKey
+    in: header
+    name: Cookie
+
+  # Token authentication for certain endpoints, called externally, such as password reset or email confirmation
+  token:
+    type: oauth2
+    flow: accessCode
+    authorizationUrl: http://dummy/
+    tokenUrl: http://dummy/
+    scopes:
+      confirm-email: confirm user's email
+      confirm-email-update: confirm user's email update
+      login: authenticate the user
+      pwd-reset: reset user's password
+
+# Default security is cookie-based user authentication
+security:
+  - userCookie: []
+
+definitions:
+
+  apiError:
+    description: Generic API error object
+    type: object
+    readOnly: true
+    properties:
+      id:
+        type: string
+      message:
+        type: string
+      details:
+        type: string
+    x-go-type:
+      import:
+        package: "gitlab.com/comentario/comentario/internal/api/exmodels"
+      type: "Error"
+
+  comment:
+    description: Comment residing on a page
+    type: object
+    readOnly: true
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique record ID
+      parentId:
+        type: string
+        format: uuid
+        description: Parent record ID, null if it's a root comment on the page
+      pageId:
+        type: string
+        format: uuid
+        description: ID of the page
+      markdown:
+        type: string
+        description: Comment text in markdown
+      html:
+        type: string
+        description: Rendered comment text in HTML
+      score:
+        type: integer
+        description: Comment score
+        x-omitempty: false
+      isSticky:
+        type: boolean
+        description: Whether the comment is sticky (attached to the top of page)
+        x-omitempty: false
+      isApproved:
+        type: boolean
+        description: Whether the comment is approved and can be seen by everyone
+        x-omitempty: false
+      isPending:
+        type: boolean
+        description: Whether the comment is pending approval
+        x-omitempty: false
+      isDeleted:
+        type: boolean
+        description: Whether the comment is marked as deleted
+        x-omitempty: false
+      createdTime:
+        type: string
+        format: date-time
+        description: When the comment was created
+      moderatedTime:
+        type: string
+        format: date-time
+        description: >
+          When a moderation action has last been applied to the comment. Visible to moderators and comment authors only
+      deletedTime:
+        type: string
+        format: date-time
+        description: When the comment was deleted, only provided for deleted comments and moderators/comment authors
+      editedTime:
+        type: string
+        format: date-time
+        description: When the comment was last edited, only provided for edited comments and moderators/comment authors
+      userCreated:
+        type: string
+        format: uuid
+        description: ID of the user who created the comment
+      userModerated:
+        type: string
+        format: uuid
+        description: >
+          ID of the user who last moderated (approved or rejected) the comment. Non-moderator users can only see a value 
+          of userCreated here, meaning the comment was immediately approved upon submission; if it was moderated by
+          someone else, the field will have no value
+      userDeleted:
+        type: string
+        format: uuid
+        description: >
+          ID of the user who deleted the comment. Non-moderator users can only see a value of userCreated here, meaning
+          the comment was deleted by its author; if it was deleted by someone else, the field will have no value
+      userEdited:
+        type: string
+        format: uuid
+        description: >
+          ID of the user who last edited the comment text. Non-moderator users can only see a value of userCreated here,
+          meaning the comment was edited by its author; if it was edited by someone else, the field will have no value
+      pendingReason:
+        type: string
+        description: Reason for the pending state of the comment, visible to moderators only
+      authorName:
+        type: string
+        description: Name of the author, in case the user isn't registered
+      authorIP:
+        type: string
+        description: IP address of the author, visible to superusers only
+      authorCountry:
+        type: string
+        description: Country matching the authorIP, visible to moderators only
+      direction:
+        type: integer
+        format: int8
+        description: Vote direction for the current user
+      url:
+        type: string
+        format: uri
+        description: Full URL of the comment
+
+  commenter:
+    description: Stripped-down, read-only version of the user who authored a comment
+    type: object
+    readOnly: true
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique user ID
+      email:
+        type: string
+        format: email
+        description: Email address of the user
+      name:
+        type: string
+        description: Full name of the user
+      websiteUrl:
+        type: string
+        format: uri
+        description: URL of the user's website
+      hasAvatar:
+        type: boolean
+        description: Whether the user has an avatar image
+        x-omitempty: false
+      isModerator:
+        type: boolean
+        description: Whether the user is a moderator on this specific domain
+        x-omitempty: false
+      isCommenter:
+        type: boolean
+        description: Whether the user is a commenter on this specific domain (false means the user is read-only)
+        x-omitempty: false
+      colourIndex:
+        type: integer
+        format: uint8
+        description: Colour hash, number based on the user's ID
+        x-omitempty: false
+      createdTime:
+        type: string
+        format: date-time
+        description: When the commenter user was created (visible to domain moderator+ only)
+      federatedIdP:
+        $ref: "#/definitions/federatedIdpId"
+        description: Optional ID of the federated identity provider used for authentication. If empty, it's a local user (visible to domain moderator+ only)
+      federatedSso:
+        type: boolean
+        description: Whether the user is authenticated via SSO (visible to domain moderator+ only)
+
+  commentSort:
+    description: Comment sorting. 1st letter defines the property, 2nd letter the direction
+    type: string
+    minLength: 2
+    maxLength: 2
+    enum:
+      - ta # By timestamp, ascending
+      - td # By timestamp, descending
+      - sa # By score, ascending
+      - sd # By score, descending
+    x-isnullable: false
+
+  domain:
+    description: Registered domain
+    type: object
+    required:
+      - host
+      - isHttps
+    properties:
+      id:
+        type: string
+        format: uuid
+        readOnly: true
+        description: Unique domain ID
+      name:
+        type: string
+        maxLength: 255
+        description: Domain display name
+      host:
+        $ref: "#/definitions/host"
+        description: Domain host
+        x-isnullable: false
+      createdTime:
+        type: string
+        format: date-time
+        readOnly: true
+        description: When the domain was created
+      isHttps:
+        type: boolean
+        description: Whether HTTPS should be used to resolve URLs on this domain (as opposed to HTTP)
+        x-omitempty: false
+      isReadonly:
+        type: boolean
+        readOnly: true
+        description: Whether the domain is readonly (no new comments are allowed)
+        x-omitempty: false
+        x-isnullable: false
+      authAnonymous:
+        type: boolean
+        description: Whether commenting by unregistered users is allowed
+        x-omitempty: false
+      authLocal:
+        type: boolean
+        description: Whether local authentication is allowed
+        x-omitempty: false
+      authSso:
+        type: boolean
+        description: Whether SSO authentication is allowed
+        x-omitempty: false
+      ssoUrl:
+        type: string
+        description: SSO provider URL
+        x-omitempty: false
+      ssoNonInteractive:
+        type: boolean
+        description: Whether to use a non-interactive SSO login
+        x-omitempty: false
+      ssoSecretConfigured:
+        type: boolean
+        readOnly: true
+        description: Whether SSO secret is configured for this domain
+        x-omitempty: false
+        x-isnullable: false
+      modAnonymous:
+        type: boolean
+        description: Whether all comments by unregistered users are to be approved by a moderator
+        x-omitempty: false
+      modAuthenticated:
+        type: boolean
+        description: Whether all comments by authenticated users are to be approved by a moderator
+        x-omitempty: false
+      modNumComments:
+        type: integer
+        format: uint
+        description: Number of first comments by user on this domain that require a moderator approval
+        x-omitempty: false
+      modUserAgeDays:
+        type: integer
+        format: uint
+        description: Number of first days since user has registered on this domain to require a moderator approval on their comments
+        x-omitempty: false
+      modLinks:
+        type: boolean
+        description: Whether all comments containing a link are to be approved by a moderator
+        x-omitempty: false
+      modImages:
+        type: boolean
+        description: Whether all comments containing an image are to be approved by a moderator
+        x-omitempty: false
+      modNotifyPolicy:
+        $ref: "#/definitions/domainModNotifyPolicy"
+        description: Moderator notification policy for domain
+      defaultSort:
+        $ref: "#/definitions/commentSort"
+        description: Default comment sorting for domain
+      countComments:
+        type: integer
+        readOnly: true
+        description: Total number of comments. -1 means the value is not provided
+        x-omitempty: false
+      countViews:
+        type: integer
+        readOnly: true
+        description: Total number of views. -1 means the value is not provided
+        x-omitempty: false
+      rootUrl:
+        type: string
+        format: uri
+        description: Root URL of the domain, without trailing slash
+        readOnly: true
+
+  domainExtension:
+    description: Domain extension info
+    type: object
+    required:
+      - id
+    properties:
+      id:
+        $ref: "#/definitions/domainExtensionId"
+        description: Extension ID
+        example: akismet
+      name:
+        type: string
+        readOnly: true
+        description: Extension display name
+        example: Akismet
+      config:
+        type: string
+        description: Extension configuration, linebreak-separated list of key=value pairs
+      requiresKey:
+        type: boolean
+        readOnly: true
+        description: Whether the extension requires an API key at domain level
+        x-omitempty: false
+
+  domainExtensionId:
+    description: Domain extension ID
+    type: string
+    enum:
+      - akismet
+      - perspective
+      - apiLayer.spamChecker
+    x-isnullable: false
+
+  domainModNotifyPolicy:
+    description: Moderator notification policy for domain
+    type: string
+    enum:
+      - none
+      - pending
+      - all
+    x-isnullable: false
+
+  domainPage:
+    description: Page on a specific domain
+    type: object
+    required:
+      - path
+      - isReadonly
+    properties:
+      id:
+        type: string
+        format: uuid
+        readOnly: true
+        description: Unique record ID
+      domainId:
+        type: string
+        format: uuid
+        readOnly: true
+        description: ID of the domain
+      path:
+        $ref: "#/definitions/path"
+        description: Page path. Can only be updated by a domain owner or superuser
+      title:
+        type: string
+        description: >
+          Optional page title. When not provided on page creation or update, will be derived automatically from the
+          actual page's HTML title. Can only be updated by a domain owner or superuser
+      isReadonly:
+        type: boolean
+        description: >
+          Whether the page is readonly (no new comments are allowed). Can be updated by a domain moderator, owner or
+          superuser
+        x-omitempty: false
+      createdTime:
+        type: string
+        format: date-time
+        readOnly: true
+        description: When the record was created
+      countComments:
+        type: integer
+        readOnly: true
+        description: Total number of comments. -1 means the value is not provided
+        x-omitempty: false
+      countViews:
+        type: integer
+        readOnly: true
+        description: Total number of views. -1 means the value is not provided
+        x-omitempty: false
+
+  domainUser:
+    description: Registered user on a domain
+    type: object
+    readOnly: true
+    required:
+      - domainId
+      - userId
+      - role
+      - notifyReplies
+      - notifyModerator
+      - notifyCommentStatus
+    properties:
+      domainId:
+        type: string
+        format: uuid
+        description: ID of the domain
+        x-omitempty: false
+        x-isnullable: false
+      userId:
+        type: string
+        format: uuid
+        description: ID of the user
+        x-omitempty: false
+        x-isnullable: false
+      role:
+        $ref: "#/definitions/domainUserRole"
+        description: Role of the user
+      notifyReplies:
+        type: boolean
+        description: Whether the user is to be notified about replies to their comments
+        x-omitempty: false
+        x-isnullable: false
+      notifyModerator:
+        type: boolean
+        description: Whether the user is to receive moderator notifications (only when is_moderator is true)
+        x-omitempty: false
+        x-isnullable: false
+      notifyCommentStatus:
+        type: boolean
+        description: Whether the user is to be notified about status changes (approved/rejected) of their comments
+        x-omitempty: false
+        x-isnullable: false
+      createdTime:
+        type: string
+        format: date-time
+        description: When the domain user was created
+
+  domainUserRole:
+    description: Role of a domain user
+    type: string
+    enum:
+      - owner
+      - moderator
+      - commenter
+      - readonly
+    x-omitempty: false
+    x-isnullable: false
+
+  dynamicConfigItem:
+    description: Dynamic configuration item
+    type: object
+    required:
+      - key
+      - value
+    properties:
+      key:
+        type: string
+        maxLength: 255
+        description: Item key
+      value:
+        type: string
+        maxLength: 255
+        description: Item value
+      datatype:
+        $ref: "#/definitions/dynamicConfigItemDatatype"
+        readOnly: true
+        description: Item datatype
+      updatedTime:
+        type: string
+        format: date-time
+        readOnly: true
+        description: Timestamp when the item was last updated in the database
+      userUpdated:
+        type: string
+        format: uuid
+        readOnly: true
+        description: Reference to the user who last updated the item in the database
+      defaultValue:
+        type: string
+        readOnly: true
+        description: Item's default value
+      section:
+        type: string
+        description: Key of the section the item belongs to
+      min:
+        type: integer
+        readOnly: true
+        description: Minimum allowed value of the setting
+        x-omitempty: false
+      max:
+        type: integer
+        readOnly: true
+        description: Maximum allowed value of the setting
+        x-omitempty: false
+
+  dynamicConfigItemDatatype:
+    description: Dynamic configuration item datatype
+    type: string
+    enum:
+      - bool
+      - int
+
+  federatedIdentityProvider:
+    description: Federated identity provider info
+    type: object
+    readOnly: true
+    required:
+      - id
+      - name
+    properties:
+      id:
+        $ref: "#/definitions/federatedIdpId"
+        description: Provider ID
+        example: github
+      name:
+        type: string
+        description: Provider display name
+        x-isnullable: false
+        example: GitHub
+
+  federatedIdpId:
+    description: Federated identity provider ID
+    type: string
+    maxLength: 37
+    pattern: '^facebook|github|gitlab|google|twitter|(oidc:[-a-z0-9]{1,32})$'
+    x-isnullable: false
+
+  host:
+    description: DNS hostname, with an optional port number
+    example: example.com:8080
+    type: string
+    minLength: 1
+    maxLength: 259  # 253 (max length of a DNS name) + ":" + 5 (port number 1..65535)
+    pattern: "[-.a-z0-9]{1,253}(:[0-9]{1-5})?"
+    x-isnullable: false
+
+  importResult:
+    description: Comment import result
+    type: object
+    readOnly: true
+    properties:
+      usersTotal:
+        type: integer
+        format: uint
+        description: Total number of users
+        x-omitempty: false
+      usersAdded:
+        type: integer
+        format: uint
+        description: Number of added users
+        x-omitempty: false
+      domainUsersAdded:
+        type: integer
+        format: uint
+        description: Number of added domain users
+        x-omitempty: false
+      pagesTotal:
+        type: integer
+        format: uint
+        description: Total number of domain pages
+        x-omitempty: false
+      pagesAdded:
+        type: integer
+        format: uint
+        description: Number of added domain pages
+        x-omitempty: false
+      commentsTotal:
+        type: integer
+        format: uint
+        description: Total number of comments processed
+        x-omitempty: false
+      commentsImported:
+        type: integer
+        format: uint
+        description: Number of imported comments
+        x-omitempty: false
+      commentsSkipped:
+        type: integer
+        format: uint
+        description: Number of skipped comments
+        x-omitempty: false
+      commentsNonDeleted:
+        type: integer
+        format: uint
+        description: Number of non-deleted imported comments
+        x-omitempty: false
+      error:
+        type: string
+        description: Any error message occurred during the import
+
+  instanceConfig:
+    description: Instance configuration
+    type: object
+    readOnly: true
+    required:
+      - staticConfig
+      - pluginConfig
+    properties:
+      staticConfig:
+        $ref: "#/definitions/instanceStaticConfig"
+        description: Static instance configuration
+      dynamicConfig:
+        type: array
+        items:
+          $ref: "#/definitions/dynamicConfigItem"
+        description: Dynamic instance configuration items
+      pluginConfig:
+        $ref: "#/definitions/instancePluginConfig"
+        description: Instance configuration of plugins
+
+  instancePluginConfig:
+    description: Instance configuration of plugins
+    type: object
+    readOnly: true
+    properties:
+      plugins:
+        type: array
+        items:
+          $ref: "#/definitions/pluginConfig"
+        description: Configured plugins data
+
+  instanceStaticConfig:
+    description: Static instance configuration
+    type: object
+    readOnly: true
+    required:
+      - baseUrl
+      - baseDocsUrl
+      - termsOfServiceUrl
+      - privacyPolicyUrl
+      - version
+      - buildDate
+      - serverTime
+      - dbVersion
+      - defaultLangId
+      - resultPageSize
+      - liveUpdateEnabled
+      - pageViewStatsEnabled
+      - pageViewStatsMaxDays
+    properties:
+      baseUrl:
+        type: string
+        x-isnullable: false
+        description: Base Comentario URL
+      baseDocsUrl:
+        type: string
+        x-isnullable: false
+        description: Base Documentation URL
+      termsOfServiceUrl:
+        type: string
+        x-isnullable: false
+        description: Terms of Service page URL
+      privacyPolicyUrl:
+        type: string
+        x-isnullable: false
+        description: Privacy Policy page URL
+      version:
+        type: string
+        x-isnullable: false
+        description: Comentario version
+      buildDate:
+        type: string
+        format: date-time
+        x-isnullable: false
+        description: Server build date
+      serverTime:
+        type: string
+        format: date-time
+        x-isnullable: false
+        description: Current server date and time
+      dbVersion:
+        type: string
+        x-isnullable: false
+        description: Database version
+      defaultLangId:
+        type: string
+        x-isnullable: false
+        description: Default interface language ID
+      homeContentUrl:
+        type: string
+        format: uri
+        description: >
+          URL of a HTML page to display on the homepage. If not provided, the homepage will redirect to login (for 
+          unauthenticated user) or dashboard (for authenticated)
+      federatedIdps:
+        type: array
+        items:
+          $ref: "#/definitions/federatedIdentityProvider"
+        description: Configured federated identity providers
+      resultPageSize:
+        type: integer
+        format: uint
+        x-isnullable: false
+        description: Max number of database rows returned per page
+      uiLanguages:
+        type: array
+        items:
+          $ref: "#/definitions/uiLanguage"
+        description: Available UI languages
+      liveUpdateEnabled:
+        type: boolean
+        x-omitempty: false
+        x-isnullable: false
+        description: Whether the Live update is enabled globally
+      pageViewStatsEnabled:
+        type: boolean
+        x-omitempty: false
+        x-isnullable: false
+        description: Whether page view statistics gathering and reporting is enabled
+      pageViewStatsMaxDays:
+        type: integer
+        format: uint
+        x-omitempty: false
+        x-isnullable: false
+        description: Maximum number of days page view statistics gets retained for
+
+  keyValueMap:
+    description: Map of key-value strings
+    type: object
+    x-go-type:
+      import:
+        package: "gitlab.com/comentario/comentario/internal/api/exmodels"
+      type: "KeyValueMap"
+
+  pageInfo:
+    description: Information about a page displaying comments
+    type: object
+    readOnly: true
+    required:
+      - baseDocsUrl
+      - termsOfServiceUrl
+      - privacyPolicyUrl
+      - version
+      - defaultLangId
+      - liveUpdateEnabled
+      - domainId
+      - domainName
+      - pageId
+      - isDomainReadonly
+      - isPageReadonly
+      - authAnonymous
+      - authLocal
+      - authSso
+      - ssoUrl
+      - ssoNonInteractive
+      - defaultSort
+      - commentDeletionAuthor
+      - commentDeletionModerator
+      - commentEditingAuthor
+      - commentEditingModerator
+      - enableCommentVoting
+      - enableRss
+      - showDeletedComments
+      - maxCommentLength
+      - showLoginForUnauth
+      - localSignupEnabled
+      - federatedSignupEnabled
+      - ssoSignupEnabled
+      - markdownImagesEnabled
+      - markdownLinksEnabled
+      - markdownTablesEnabled
+    properties:
+      baseDocsUrl:
+        type: string
+        description: Base Documentation URL
+        x-isnullable: false
+      termsOfServiceUrl:
+        type: string
+        description: Terms of Service page URL
+        x-isnullable: false
+      privacyPolicyUrl:
+        type: string
+        description: Privacy Policy page URL
+        x-isnullable: false
+      version:
+        type: string
+        description: Comentario version
+        x-isnullable: false
+      defaultLangId:
+        type: string
+        description: Default interface language ID
+        x-isnullable: false
+      liveUpdateEnabled:
+        type: boolean
+        description: Whether the Live update is enabled globally
+        x-isnullable: false
+        x-omitempty: false
+      domainId:
+        type: string
+        format: uuid
+        description: Domain ID
+        x-isnullable: false
+      domainName:
+        type: string
+        description: Domain display name
+        x-isnullable: false
+      pageId:
+        type: string
+        format: uuid
+        description: Page ID
+        x-isnullable: false
+      isDomainReadonly:
+        type: boolean
+        description: Whether the domain is readonly (no new comments are allowed)
+        x-isnullable: false
+        x-omitempty: false
+      isPageReadonly:
+        type: boolean
+        description: Whether the page is readonly (no new comments are allowed)
+        x-isnullable: false
+        x-omitempty: false
+      authAnonymous:
+        type: boolean
+        description: Whether commenting by unregistered users is allowed
+        x-isnullable: false
+        x-omitempty: false
+      authLocal:
+        type: boolean
+        description: Whether local authentication is allowed
+        x-isnullable: false
+        x-omitempty: false
+      authSso:
+        type: boolean
+        description: Whether SSO authentication is allowed
+        x-isnullable: false
+        x-omitempty: false
+      ssoUrl:
+        type: string
+        description: SSO provider URL
+        x-isnullable: false
+      ssoNonInteractive:
+        type: boolean
+        description: Whether to use a non-interactive SSO login
+        x-isnullable: false
+        x-omitempty: false
+      defaultSort:
+        $ref: "#/definitions/commentSort"
+        description: Default comment sorting for domain
+      idps:
+        type: array
+        items:
+          $ref: "#/definitions/federatedIdentityProvider"
+        description: List of enabled federated identity providers
+      commentDeletionAuthor:
+        type: boolean
+        description: Whether comment authors are allowed to delete their comments
+        x-isnullable: false
+        x-omitempty: false
+      commentDeletionModerator:
+        type: boolean
+        description: Whether domain moderators are allowed to delete comments
+        x-isnullable: false
+        x-omitempty: false
+      commentEditingAuthor:
+        type: boolean
+        description: Whether comment authors are allowed to edit their comments
+        x-isnullable: false
+        x-omitempty: false
+      commentEditingModerator:
+        type: boolean
+        description: Whether domain moderators are allowed to edit comments
+        x-isnullable: false
+        x-omitempty: false
+      enableCommentVoting:
+        type: boolean
+        description: Whether voting on comments is enabled
+        x-isnullable: false
+        x-omitempty: false
+      enableRss:
+        type: boolean
+        description: Whether comment RSS feed is enabled
+        x-isnullable: false
+        x-omitempty: false
+      showDeletedComments:
+        type: boolean
+        description: Whether deleted comments should be shown
+        x-isnullable: false
+        x-omitempty: false
+      maxCommentLength:
+        type: integer
+        description: Maximum comment text length
+        x-isnullable: false
+        x-omitempty: false
+      showLoginForUnauth:
+        type: boolean
+        description: Whether to show login dialog when an unauthenticated user is submitting a comment
+        x-isnullable: false
+        x-omitempty: false
+      localSignupEnabled:
+        type: boolean
+        description: Whether new users can register locally (with email and password)
+        x-isnullable: false
+        x-omitempty: false
+      federatedSignupEnabled:
+        type: boolean
+        description: Whether new users can register via a federated identity provider
+        x-isnullable: false
+        x-omitempty: false
+      ssoSignupEnabled:
+        type: boolean
+        description: Whether new users can register via SSO
+        x-isnullable: false
+        x-omitempty: false
+      markdownImagesEnabled:
+        type: boolean
+        description: Whether images are enabled in Markdown
+        x-isnullable: false
+        x-omitempty: false
+      markdownLinksEnabled:
+        type: boolean
+        description: Whether links are enabled in Markdown
+        x-isnullable: false
+        x-omitempty: false
+      markdownTablesEnabled:
+        type: boolean
+        description: Whether tables are enabled in Markdown
+        x-isnullable: false
+        x-omitempty: false
+
+  pageStatsItem:
+    description: Item of page statistics
+    type: object
+    readOnly: true
+    required:
+      - domainId
+      - domainHost
+      - id
+      - path
+      - count
+    properties:
+      domainId:
+        type: string
+        x-isnullable: false
+      domainHost:
+        type: string
+        x-isnullable: false
+      id:
+        type: string
+        x-isnullable: false
+      path:
+        type: string
+        x-isnullable: false
+      title:
+        type: string
+      count:
+        type: number
+        format: uint
+        x-omitempty: false
+        x-isnullable: false
+    x-go-type:
+      import:
+        package: "gitlab.com/comentario/comentario/internal/api/exmodels"
+      type: "PageStatsItem"
+
+  path:
+    description: Path on a certain host
+    example: /foo
+    type: string
+    minLength: 1
+    maxLength: 2075 # 2083 (max URL length) - 8 (http://a, the shortest possible prefix)
+    pattern: "/.*"
+    x-isnullable: false
+
+  pluginConfig:
+    description: Configuration of a plugin
+    type: object
+    readOnly: true
+    required:
+      - id
+      - path
+    properties:
+      id:
+        type: string
+        description: Unique plugin ID
+        x-isnullable: false
+      path:
+        type: string
+        description: URL path the plugin responds at
+        x-isnullable: false
+      uiResources:
+        type: array
+        items:
+          $ref: "#/definitions/pluginUIResourceConfig"
+        description: Configuration of the plugin's UI resources
+      uiPlugs:
+        type: array
+        items:
+          $ref: "#/definitions/pluginUIPlugConfig"
+        description: Configuration of the plugin's UI plugs
+
+  pluginUILabel:
+    description: Label of a plugin UI plug for a specific language
+    type: object
+    readOnly: true
+    required:
+      - language
+      - text
+    properties:
+      language:
+        type: string
+        description: Language tag
+        x-isnullable: false
+      text:
+        type: string
+        description: Label text
+        x-isnullable: false
+
+  pluginUIResourceConfig:
+    description: Configuration of a plugin UI resource
+    type: object
+    readOnly: true
+    required:
+      - type
+      - url
+      - rel
+    properties:
+      type:
+        type: string
+        description: Type of the resource
+        x-isnullable: false
+      url:
+        type: string
+        description: URL of the resource
+        x-isnullable: false
+      rel:
+        type: string
+        description: Relationship to the host document
+        x-isnullable: false
+
+  pluginUIPlugConfig:
+    description: Configuration of a plugin UI plug
+    type: object
+    readOnly: true
+    required:
+      - location
+      - labels
+      - componentTag
+      - path
+    properties:
+      location:
+        type: string
+        description: Location of the plug
+        x-isnullable: false
+      labels:
+        type: array
+        items:
+          $ref: "#/definitions/pluginUILabel"
+        description: Plug's labels
+      componentTag:
+        type: string
+        description: Plug's component tag
+        x-isnullable: false
+      path:
+        type: string
+        description: Path the plug's component will be available at
+        x-isnullable: false
+
+  principal:
+    description: Authenticated or anonymous user
+    type: object
+    readOnly: true
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique user ID
+      email:
+        type: string
+        format: email
+        description: Email address of the user
+      name:
+        type: string
+        description: Full name of the user
+      langId:
+        type: string
+        description: User's preferred interface language ID (BCP47 tag)
+      websiteUrl:
+        type: string
+        format: uri
+        description: Optional website URL of the user
+      hasAvatar:
+        type: boolean
+        description: Whether the user has an avatar image
+        x-omitempty: false
+      isLocal:
+        type: boolean
+        description: Whether the user is authenticated locally (as opposed to via a federated/SSO identity provider)
+        x-omitempty: false
+      isSso:
+        type: boolean
+        description: Whether the user is authenticated via SSO
+        x-omitempty: false
+      isConfirmed:
+        type: boolean
+        description: Whether the user has confirmed their email address
+        x-omitempty: false
+      isSuperuser:
+        type: boolean
+        description: Whether the user is a "super user" (instance admin)
+        x-omitempty: false
+      isOwner:
+        type: boolean
+        description: Whether the user is an owner of the domain (only for commenter auth)
+        x-omitempty: false
+      isModerator:
+        type: boolean
+        description: Whether the user is a moderator on this specific domain (only for commenter auth)
+        x-omitempty: false
+      isCommenter:
+        type: boolean
+        description: Whether the user is a commenter on this specific domain (false means the user is read-only; only for commenter auth)
+        x-omitempty: false
+      notifyReplies:
+        type: boolean
+        description: Whether the user is to be notified about replies to their comments (only for commenter auth)
+        x-omitempty: false
+      notifyModerator:
+        type: boolean
+        description: Whether the user is to receive moderator notifications (only for commenter auth)
+        x-omitempty: false
+      notifyCommentStatus:
+        type: boolean
+        description: Whether the user is to be notified about status changes (approved/rejected) of their comments (only for commenter auth)
+        x-omitempty: false
+      colourIndex:
+        type: integer
+        format: uint8
+        description: Colour hash, number based on the user's ID
+        x-omitempty: false
+      countDomainsOwned:
+        type: integer
+        description: Number of domains the user owns, null if unknown
+        x-omitempty: false
+        x-isnullable: true
+      attributes:
+        $ref: "#/definitions/keyValueMap"
+        description: The principal's attributes
+
+  releaseMetadata:
+    description: Release information
+    type: object
+    required:
+      - name
+      - version
+      - pageUrl
+    properties:
+      name:
+        type: string
+        description: Release name
+        x-isnullable: false
+      version:
+        type: string
+        description: Released version
+        x-isnullable: false
+      pageUrl:
+        type: string
+        description: Release page URL
+        x-isnullable: false
+
+  statsDailyCounts:
+    description: Daily statistical data, one value per day
+    type: array
+    readOnly: true
+    items:
+      type: integer
+      format: uint
+
+  statsDimensionItem:
+    description: Dimension element with a count
+    type: object
+    readOnly: true
+    required:
+      - element
+      - count
+    properties:
+      element:
+        type: string
+        x-isnullable: false
+      count:
+        type: number
+        format: uint
+        x-omitempty: false
+        x-isnullable: false
+    x-go-type:
+      import:
+        package: "gitlab.com/comentario/comentario/internal/api/exmodels"
+      type: "StatsDimensionItem"
+
+  statsDimensionCounts:
+    description: Counts per dimension element
+    type: array
+    readOnly: true
+    items:
+      $ref: "#/definitions/statsDimensionItem"
+    x-go-type:
+      import:
+        package: "gitlab.com/comentario/comentario/internal/api/exmodels"
+      type: "StatsDimensionCounts"
+
+  statsTotals:
+    description: Total statistical figures for Comentario dashboard
+    type: object
+    readOnly: true
+    required:
+      - countUsersTotal
+      - countUsersBanned
+      - countUsersNonBanned
+      - countDomainsOwned
+      - countDomainsModerated
+      - countDomainsCommenter
+      - countDomainsReadonly
+      - countPagesModerated
+      - countDomainUsers
+      - countComments
+      - countCommenters
+      - countPagesCommented
+      - countOwnComments
+    properties:
+      countUsersTotal:
+        type: integer
+        format: int64
+        description: Total number of users the current user can manage (superuser only)
+        x-omitempty: false
+        x-isnullable: false
+      countUsersBanned:
+        type: integer
+        format: int64
+        description: Number of banned users the current user can manage (superuser only)
+        x-omitempty: false
+        x-isnullable: false
+      countUsersNonBanned:
+        type: integer
+        format: int64
+        description: Number of non-banned users the current user can manage (superuser only)
+        x-omitempty: false
+        x-isnullable: false
+      countDomainsOwned:
+        type: integer
+        format: int64
+        description: Number of domains the current user owns
+        x-omitempty: false
+        x-isnullable: false
+      countDomainsModerated:
+        type: integer
+        format: int64
+        description: Number of domains the current user is a moderator on
+        x-omitempty: false
+        x-isnullable: false
+      countDomainsCommenter:
+        type: integer
+        format: int64
+        description: Number of domains the current user is a commenter on
+        x-omitempty: false
+        x-isnullable: false
+      countDomainsReadonly:
+        type: integer
+        format: int64
+        description: Number of domains the current user has the readonly status on
+        x-omitempty: false
+        x-isnullable: false
+      countPagesModerated:
+        type: integer
+        format: int64
+        description: Number of pages the current user can moderate
+        x-omitempty: false
+        x-isnullable: false
+      countDomainUsers:
+        type: integer
+        format: int64
+        description: Number of domain users the current user can manage
+        x-omitempty: false
+        x-isnullable: false
+      countComments:
+        type: integer
+        format: int64
+        description: Number of comments the current user can moderate
+        x-omitempty: false
+        x-isnullable: false
+      countCommenters:
+        type: integer
+        format: int64
+        description: Number of authors of comment the current user can moderate
+        x-omitempty: false
+        x-isnullable: false
+      countPagesCommented:
+        type: integer
+        format: int64
+        description: Number of pages the current user commented on
+        x-omitempty: false
+        x-isnullable: false
+      countOwnComments:
+        type: integer
+        format: int64
+        description: Number of comments the current user authored
+        x-omitempty: false
+        x-isnullable: false
+
+  uiLanguage:
+    description: UI language
+    type: object
+    readOnly: true
+    properties:
+      id:
+        type: string
+        description: Language ID, such as 'en' or 'zh_CN'
+      nameEnglish:
+        type: string
+        description: Language name in English
+      nameNative:
+        type: string
+        description: Language name in the language self
+      isFrontendLanguage:
+        type: boolean
+        description: Whether the language is also available in the frontend (Administration UI)
+        x-omitempty: false
+
+  user:
+    description: User
+    type: object
+    required:
+      - langId
+    properties:
+      id:
+        type: string
+        format: uuid
+        readOnly: true
+        description: Unique user ID
+      email:
+        type: string
+        format: email
+        description: Unique user email. Immutable for a federated user (must be omitted in update requests)
+      name:
+        type: string
+        description: User's full name. Immutable for a federated user (must be omitted in update requests)
+      langId:
+        type: string
+        minLength: 1
+        maxLength: 255
+        description: User's preferred interface language ID (BCP47 tag)
+      password:
+        type: string
+        format: password
+        description: >
+          Password (write-only). If empty, the password remains unchanged. Immutable for a federated user (must be
+          omitted in update requests)
+        maxLength: 63
+      systemAccount:
+        type: boolean
+        readOnly: true
+        description: Whether the user is a system account (cannot sign in)
+        x-omitempty: false
+        x-isnullable: false
+      isSuperuser:
+        type: boolean
+        description: Whether the user is a "superuser" (instance admin)
+        x-omitempty: false
+        x-isnullable: false
+      confirmed:
+        type: boolean
+        description: Whether the user's email has been confirmed
+        x-omitempty: false
+        x-isnullable: false
+      confirmedTime:
+        type: string
+        format: date-time
+        readOnly: true
+        description: When the user's email has been confirmed
+      createdTime:
+        type: string
+        format: date-time
+        readOnly: true
+        description: When the user was created
+      userCreated:
+        type: string
+        format: uuid
+        readOnly: true
+        description: Reference to the user who created this one. null if the used signed up themselves
+      signupIP:
+        type: string
+        readOnly: true
+        description: IP address the user signed up or was created from
+      signupCountry:
+        type: string
+        readOnly: true
+        description: 2-letter country code matching the signupIP
+      signupHost:
+        type: string
+        readOnly: true
+        description: Host the user signed up on (only for commenter signup, empty for UI signup)
+      banned:
+        type: boolean
+        readOnly: true
+        description: Whether the user is banned
+        x-omitempty: false
+        x-isnullable: false
+      bannedTime:
+        type: string
+        format: date-time
+        readOnly: true
+        description: When the user was banned
+      userBanned:
+        type: string
+        format: uuid
+        readOnly: true
+        description: Reference to the user who banned this one
+      remarks:
+        type: string
+        description: Optional remarks for the user
+      federatedIdP:
+        $ref: "#/definitions/federatedIdpId"
+        readOnly: true
+        description: Optional ID of the federated identity provider used for authentication. If empty, it's a local user
+      federatedSso:
+        type: boolean
+        readOnly: true
+        description: Whether the user is authenticated via SSO
+        x-omitempty: false
+        x-isnullable: false
+      federatedId:
+        type: string
+        readOnly: true
+        description: User ID as reported by the federated identity provider (only when federatedIdP/federatedSso is set)
+      hasAvatar:
+        type: boolean
+        readOnly: true
+        description: Optional user's avatar image
+        x-omitempty: false
+        x-isnullable: false
+      websiteUrl:
+        type: string
+        format: uri
+        description: Optional user's website URL. Immutable for a federated user (must be omitted in update requests)
+      colourIndex:
+        type: integer
+        format: uint8
+        readOnly: true
+        description: Colour hash, number based on the user's ID
+        x-omitempty: false
+      passwordChangeTime:
+        type: string
+        format: datetime
+        readOnly: true
+        description: When the user last changed their password
+      lastLoginTime:
+        type: string
+        format: datetime
+        readOnly: true
+        description: When the user last logged in successfully
+      lastFailedLoginTime:
+        type: string
+        format: datetime
+        readOnly: true
+        description: When the user last failed to log in due to wrong credentials. null if there was never a failed login
+      failedLoginAttempts:
+        type: integer
+        readOnly: true
+        description: Number of failed login attempts
+      isLocked:
+        type: boolean
+        readOnly: true
+        description: Whether the user is locked out
+        x-omitempty: false
+        x-isnullable: false
+      lockedTime:
+        type: string
+        format: datetime
+        readOnly: true
+        description: When the user was locked (only if isLocked is true)
+      countDomainsOwned:
+        type: integer
+        readOnly: true
+        description: Number of domains the user owns, null if unknown
+        x-omitempty: false
+        x-isnullable: true
+
+  userSession:
+    description: User session
+    type: object
+    readOnly: true
+    required:
+      - id
+      - userId
+      - createdTime
+      - expiresTime
+      - host
+      - proto
+      - ip
+      - country
+      - browserName
+      - browserVersion
+      - osName
+      - osVersion
+      - device
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique session ID
+        x-isnullable: false
+      userId:
+        type: string
+        format: uuid
+        description: ID of the user who owns the session
+        x-isnullable: false
+      createdTime:
+        type: string
+        format: datetime
+        description: When the session was created
+        x-isnullable: false
+      expiresTime:
+        type: string
+        format: datetime
+        description: When the session expires
+        x-isnullable: false
+      host:
+        type: string
+        description: Host the session was created on (only for commenter login, empty for UI login)
+        x-isnullable: false
+        x-omitempty: false
+      proto:
+        type: string
+        description: The protocol version, like "HTTP/1.0"
+        x-isnullable: false
+        x-omitempty: false
+      ip:
+        type: string
+        description: (Part of) IP address the session was created from
+        x-isnullable: false
+        x-omitempty: false
+      country:
+        type: string
+        description: 2-letter country code matching the ip
+        x-isnullable: false
+        x-omitempty: false
+      browserName:
+        type: string
+        description: Name of the user's browser
+        x-isnullable: false
+        x-omitempty: false
+      browserVersion:
+        type: string
+        description: Version of the user's browser
+        x-isnullable: false
+        x-omitempty: false
+      osName:
+        type: string
+        description: Name of the user's OS
+        x-isnullable: false
+        x-omitempty: false
+      osVersion:
+        type: string
+        description: Version of the user's OS
+        x-isnullable: false
+        x-omitempty: false
+      device:
+        type: string
+        description: User's device type
+        x-isnullable: false
+        x-omitempty: false
+
+parameters:
+
+  federatedIdpId:
+    in: path
+    name: provider
+    required: true
+    description: Federated identity provider ID. The same as the federatedIdpId type, but also includes 'sso'
+    type: string
+    maxLength: 37
+    pattern: '^facebook|github|gitlab|google|twitter|sso|(oidc:[-a-z0-9]{1,32})$'
+
+  pathDailyMetric:
+    name: metric
+    in: path
+    required: true
+    description: Metric for returning daily stats on
+    type: string
+    enum:
+      - comments
+      - domainUsers
+      - domainPages
+      - views
+
+  pathHost:
+    name: host
+    in: path
+    required: true
+    description: Domain host path parameter
+    type: string
+    minLength: 1
+    maxLength: 259
+    pattern: "[-.a-z0-9]{1,253}(:[0-9]{1-5})?"
+
+  pathImportSource:
+    name: source
+    in: path
+    required: true
+    description: Source of the data to import into a domain
+    type: string
+    enum:
+      - comentario
+      - disqus
+      - wordpress
+
+  pathUuid:
+    in: path
+    name: uuid
+    required: true
+    description: UUID in the path
+    type: string
+    format: uuid
+    x-isnullable: false
+
+  pathViewStatsDimension:
+    name: dimension
+    in: path
+    required: true
+    description: Dimension of view stats
+    type: string
+    enum:
+      - proto
+      - country
+      - browser
+      - os
+      - device
+
+  queryDomainId:
+    in: query
+    name: domain
+    required: true
+    description: Domain UUID in the query
+    type: string
+    format: uuid
+
+  queryFilter:
+    name: filter
+    in: query
+    required: false
+    description: Optional substring to filter the result by
+    type: string
+    maxLength: 100
+
+  queryOptionalDomain:
+    name: domain
+    in: query
+    required: false
+    description: Optional domain query parameter
+    type: string
+    format: uuid
+
+  queryOptionalHost:
+    name: host
+    in: query
+    required: false
+    description: Optional host query parameter
+    type: string
+    minLength: 1
+    maxLength: 259
+    pattern: "[-.a-z0-9]{1,253}(:[0-9]{1-5})?"
+
+  querySortDesc:
+    name: sortDesc
+    in: query
+    required: false
+    description: 'Optional sort direction: ascending (false) or descending (true)'
+    type: boolean
+
+  queryPageNumber:
+    name: page
+    in: query
+    required: false
+    description: Optional page number to return results for
+    type: integer
+    format: uint
+    minimum: 1
+    default: 1
+
+  queryStatsDays:
+    in: query
+    name: days
+    required: false
+    type: integer
+    format: uint
+    minimum: 1
+    default: 30
+    description: Number of days to get statistics for
+
+  queryToken:
+    in: query
+    name: token
+    required: true
+    description: ID consisting of 64 hex digits, in the query parameter
+    type: string
+    minLength: 64
+    maxLength: 64
+    pattern: '[0-9a-f]{64}'
+
+  queryUserId:
+    in: query
+    name: user
+    required: true
+    description: User UUID in the query
+    type: string
+    format: uuid
+
+  queryUserSecret:
+    in: query
+    name: secret
+    required: true
+    description: User's secret token in the query
+    type: string
+    format: uuid
+
+responses:
+  # 400
+  BadRequest:
+    description: Invalid input data has been passed
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 401
+  Unauthorised:
+    description: User is not authorised
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 403
+  Forbidden:
+    description: The specified operation is not allowed
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 404
+  NotFound:
+    description: The specified resource was not found
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 422
+  UnprocessableEntity:
+    description: Invalid input data has been passed
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 500
+  InternalError:
+    description: Server experiences an internal error
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 502
+  BadGateway:
+    description: Data relay or dependent service failure
+    schema:
+      $ref: "#/definitions/apiError"
+
+  # 307
+  OAuthRedirect:
+    description: Redirecting to a federated identity provider
+    headers:
+      Location:
+        type: string
+
+  # 401
+  OAuthFailure:
+    description: Authentication failed
+    schema:
+      type: string
+
+paths:
+  /_:
+    options:
+      operationId: Generic
+      summary: Fake endpoint to provide generic errors
+      tags:
+        - ApiGeneral
+      responses:
+        400:
+          $ref: "#/responses/BadRequest"
+        401:
+          $ref: "#/responses/Unauthorised"
+        403:
+          $ref: "#/responses/Forbidden"
+        404:
+          $ref: "#/responses/NotFound"
+        422:
+          $ref: "#/responses/UnprocessableEntity"
+        500:
+          $ref: "#/responses/InternalError"
+        502:
+          $ref: "#/responses/BadGateway"
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Mail
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /mail/unsubscribe:
+    get:
+      operationId: MailUnsubscribe
+      summary: Unsubscribe a user from email notifications
+      tags:
+        - ApiGeneral
+      security: []
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+        - $ref: "#/parameters/queryUserId"
+        - $ref: "#/parameters/queryUserSecret"
+        - in: query
+          name: kind
+          required: true
+          description: Kind of notifications to unsubscribe the user from
+          type: string
+          enum:
+            - reply
+            - moderator
+            - commentStatus
+      responses:
+        307:
+          description: The user has been unsubscribed from notifications, redirecting to the UI
+          headers:
+            Location:
+              type: string
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Auth
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /auth/confirm:
+    get:
+      operationId: AuthConfirm
+      summary: Confirm the user's email using the provided token
+      tags:
+        - ApiGeneral
+      security:
+        - token: [confirm-email]
+      responses:
+        307:
+          description: Email has been confirmed, redirecting to the signup URL, if any, otherwise to login
+          headers:
+            Location:
+              type: string
+
+  /auth/login:
+    post:
+      operationId: AuthLogin
+      summary: Sign in as an existing user
+      tags:
+        - ApiGeneral
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+                minLength: 1
+                maxLength: 63
+      responses:
+        200:
+          description: Login successful
+          schema:
+            $ref: "#/definitions/principal"
+
+  /auth/login/token:
+    post:
+      operationId: AuthLoginTokenNew
+      summary: Request a new anonymous token with the "login" scope, which is to be used for subsequent federated authentication
+      tags:
+        - ApiGeneral
+      security: []
+      responses:
+        200:
+          description: New anonymous token is returned
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+                description: New anonymous token
+
+    put:
+      operationId: AuthLoginTokenRedeem
+      summary: Log in using the provided, non-anonymous or no longer anonymous, token
+      tags:
+        - ApiGeneral
+      security:
+        - token: [login]
+      responses:
+        200:
+          description: Login successful
+          schema:
+            $ref: "#/definitions/principal"
+
+  /auth/logout:
+    post:
+      operationId: AuthLogout
+      summary: Log the current user out
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: User has been logged out
+
+  /auth/profile:
+    post:
+      operationId: AuthSignup
+      summary: Sign up as a new owner
+      tags:
+        - ApiGeneral
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - name
+              - email
+              - password
+            properties:
+              name:
+                type: string
+                minLength: 2
+                maxLength: 63
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+                format: password
+                maxLength: 63
+      responses:
+        200:
+          description: Owner has signed up successfully, returning a principal
+          schema:
+            $ref: "#/definitions/principal"
+
+    delete:
+      operationId: AuthDeleteProfile
+      summary: Delete the account of the current user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              deleteComments:
+                type: boolean
+                description: Whether to delete all comments created by the user
+              purgeComments:
+                type: boolean
+                description: Whether to permanently delete all comments, including replies. Ignored if deleteComments is false
+      responses:
+        200:
+          description: Owner's account has been deleted
+          schema:
+            type: object
+            properties:
+              countDeletedComments:
+                type: integer
+                description: Number of deleted comments (if opted in for deletion)
+                x-omitempty: false
+
+  /auth/password-reset:
+    post:
+      operationId: AuthPwdResetSendEmail
+      summary: Request a password reset for a local user by sending them an email
+      tags:
+        - ApiGeneral
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+            properties:
+              email:
+                type: string
+                format: email
+      responses:
+        204:
+          description: Reset email has been sent, if the email address is known
+
+    put:
+      operationId: AuthPwdResetChange
+      summary: Give a local user a new password
+      tags:
+        - ApiGeneral
+      security:
+        - token: [pwd-reset]
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - password
+            properties:
+              password:
+                type: string
+                format: password
+                description: New password to set
+                maxLength: 63
+      responses:
+        204:
+          description: Password has been reset
+
+  # OAuth
+
+  /oauth/{provider}:
+    get:
+      operationId: AuthOauthInit
+      summary: Initiate signing in via federated authentication using an anonymous token
+      tags:
+        - ApiGeneral
+      security: []
+      produces:
+        - text/html # For an error response only, otherwise a redirect is issued
+      parameters:
+        - $ref: "#/parameters/federatedIdpId"
+        - $ref: "#/parameters/queryOptionalHost"
+        - $ref: "#/parameters/queryToken"
+      responses:
+        307:
+          $ref: "#/responses/OAuthRedirect"
+        401:
+          $ref: "#/responses/OAuthFailure"
+
+  /oauth/{provider}/callback:
+    get:
+      operationId: AuthOauthCallback
+      summary: Endpoint that gets called back by the federated authentication provider
+      tags:
+        - ApiGeneral
+      security: []
+      produces:
+        - text/html
+      parameters:
+        - $ref: "#/parameters/federatedIdpId"
+      responses:
+        200:
+          description: User has successfully signed in
+        401:
+          $ref: "#/responses/OAuthFailure"
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Current user
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /user:
+    get:
+      operationId: CurUserGet
+      summary: Fetch the currently authenticated user, if any
+      tags:
+        - ApiGeneral
+      security: []
+      responses:
+        200:
+          description: User is authenticated, principal info returned
+          schema:
+            $ref: "#/definitions/principal"
+        204:
+          description: User is not authenticated
+
+    put:
+      operationId: CurUserUpdate
+      summary: Update profile details of the current user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - langId
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 63
+                description: New full name of the user. Required for a local user, otherwise must not be present
+              websiteUrl:
+                type: string
+                format: uri
+                description: Website URL of the user. Optional for a local user, otherwise must not be present
+              langId:
+                type: string
+                minLength: 1
+                maxLength: 255
+                description: User's preferred language ID (BCP 47 tag)
+              newPassword:
+                type: string
+                format: password
+                maxLength: 63
+                description: >
+                  New password to set for the user. Optional for a local user (if not provided, the password remains 
+                  unchanged), otherwise must not be present
+              curPassword:
+                type: string
+                minLength: 1
+                maxLength: 63
+                description: Current password of the user. Required if newPassword is given, otherwise ignored
+      responses:
+        204:
+          description: User profile has been updated
+
+  /user/avatar:
+    post:
+      operationId: CurUserSetAvatar
+      summary: Upload an avatar for the current user
+      tags:
+        - ApiGeneral
+      consumes:
+        - multipart/form-data
+      parameters:
+        - in: formData
+          name: data
+          type: file
+          required: false
+          maxLength: 1048576 # 1 MiB
+          description: Avatar image file, if omitted, the current user's avatar will be removed
+      responses:
+        204:
+          description: Avatar has been set
+
+  /user/avatar/gravatar:
+    post:
+      operationId: CurUserSetAvatarFromGravatar
+      summary: Download and set the current user's avatar from Gravatar
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: Avatar has been successfully updated
+
+  /user/email:
+    put:
+      operationId: CurUserEmailUpdateRequest
+      summary: Request an update of the current user's email address. Only applicable to a local user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+                description: New email for the user
+              password:
+                type: string
+                minLength: 1
+                maxLength: 63
+                description: User's current password
+      responses:
+        200:
+          description: User's email update is complete or pending confirmation
+          schema:
+            type: object
+            properties:
+              confirmationExpected:
+                type: boolean
+                description: If false, the new email is already set. If true, a change confirmation was sent to the new email
+                x-omitempty: false
+
+  /user/email/confirm:
+    get:
+      operationId: CurUserEmailUpdateConfirm
+      summary: Confirm the user's email update using the provided token
+      tags:
+        - ApiGeneral
+      security:
+        - token: [confirm-email-update]
+      parameters:
+        - in: query
+          name: email
+          required: true
+          description: New email for the user
+          type: string
+          format: email
+        - in: query
+          name: hmac
+          required: true
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: '[0-9a-f]{64}'
+          description: HMAC signature for the update
+      responses:
+        307:
+          description: Email has been updated, redirecting to the profile
+          headers:
+            Location:
+              type: string
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Embed API
+  #---------------------------------------------------------------------------------------------------------------------
+
+  # i18n
+
+  /embed/i18n/{lang}/messages:
+    get:
+      operationId: EmbedI18nMessages
+      summary: Get messages in the given language
+      tags:
+        - ApiEmbed
+      security: []
+      parameters:
+        - name: lang
+          in: path
+          required: true
+          description: Language code to get messages for
+          type: string
+      responses:
+        200:
+          description: >
+            Map of all messages for the specified language, indexed by message ID. The map is enriched with the extra
+            "_lang" parameter, which indicates the actual language being served; it can be different from the requested
+            one due to unsupported languages or fallbacks
+          schema:
+            type: object
+            x-go-type:
+              import:
+                package: "gitlab.com/comentario/comentario/internal/api/exmodels"
+              type: "KeyValueMap"
+
+  # Auth
+
+  /embed/auth/login:
+    post:
+      operationId: EmbedAuthLogin
+      summary: Sign a commenter in
+      tags:
+        - ApiEmbed
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+              - password
+              - host
+            properties:
+              email:
+                type: string
+                format: email
+                description: Commenter's email
+              password:
+                type: string
+                minLength: 1
+                maxLength: 63
+                description: Commenter's password
+              host:
+                $ref: "#/definitions/host"
+                description: Host the commenter is signing in on
+      responses:
+        200:
+          description: Logged in successfully
+          schema:
+            type: object
+            properties:
+              sessionToken:
+                type: string
+                description: Session token to authenticate subsequent API requests with
+              principal:
+                $ref: "#/definitions/principal"
+                description: Authenticated principal
+
+  /embed/auth/login/token:
+    post:
+      operationId: EmbedAuthLoginTokenNew
+      summary: >
+        Request a new token with the "login" scope. If there's no security header provided, the returned token will be
+        anonymous (not bound to any user yet), to be used for subsequent federated authentication. If there is a 
+        security header, the returned token will be bound to the corresponding user right away, and can be used for
+        logging in via a token redemption endpoint
+      tags:
+        - ApiEmbed
+      # Security is optional here
+      security: []
+      responses:
+        200:
+          description: New anonymous token is returned
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+                description: New anonymous token
+
+    put:
+      operationId: EmbedAuthLoginTokenRedeem
+      summary: Log in using the provided, no longer anonymous, token
+      tags:
+        - ApiEmbed
+      security:
+        - token: [login]
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - host
+            properties:
+              host:
+                $ref: "#/definitions/host"
+                description: Host the commenter is signing in on
+      responses:
+        200:
+          description: Logged in successfully
+          schema:
+            type: object
+            properties:
+              sessionToken:
+                type: string
+                description: Session token to authenticate subsequent API requests with
+              principal:
+                $ref: "#/definitions/principal"
+                description: Authenticated principal
+
+  /embed/auth/logout:
+    post:
+      operationId: EmbedAuthLogout
+      summary: Log the currently signed-in commenter out
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      responses:
+        204:
+          description: Logged out successfully
+
+  /embed/auth/signup:
+    post:
+      operationId: EmbedAuthSignup
+      summary: Sign up as a new commenter
+      tags:
+        - ApiEmbed
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - domainId
+              - email
+              - name
+              - password
+              - url
+            properties:
+              domainId:
+                description: ID of the domain the user is signing up on
+                type: string
+                format: uuid
+                x-isnullable: false
+              email:
+                type: string
+                format: email
+                description: User's email
+              name:
+                type: string
+                minLength: 1
+                maxLength: 63
+                description: User's full name
+              password:
+                type: string
+                format: password
+                maxLength: 63
+                description: User's password
+              websiteUrl:
+                type: string
+                format: uri
+                description: Optional website URL of the user
+              url:
+                type: string
+                format: uri
+                description: URL the user signed up on
+      responses:
+        200:
+          description: Commenter signed up successfully
+          schema:
+            type: object
+            properties:
+              isConfirmed:
+                type: boolean
+                description: Whether the user has been immediately confirmed
+                x-omitempty: false
+  /embed/auth/user:
+    post:
+      operationId: EmbedAuthCurUserGet
+      summary: Request commenter's sign-in status and, if the commenter's signed in, their details
+      tags:
+        - ApiEmbed
+      security: []
+      responses:
+        204:
+          description: User is not signed in
+        200:
+          description: User is authenticated, principal info returned
+          schema:
+            $ref: "#/definitions/principal"
+
+    put:
+      operationId: EmbedAuthCurUserUpdate
+      summary: Update commenter settings
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - domainId
+            properties:
+              domainId:
+                type: string
+                format: uuid
+                description: ID of the domain to apply user notification settings on
+              notifyReplies:
+                type: boolean
+                description: Whether the user is to be notified about replies to their comments
+              notifyModerator:
+                type: boolean
+                description: Whether the user is to receive moderator notifications
+              notifyCommentStatus:
+                type: boolean
+                description: Whether the user is to be notified about status changes (approved/rejected) of their comments
+      responses:
+        204:
+          description: Commenter details haven been updated
+
+  # Comments
+
+  /embed/comments:
+    post:
+      operationId: EmbedCommentList
+      summary: Get a list of comments and commenters for the given host/path combination
+      tags:
+        - ApiEmbed
+      # Security will be enforced directly on the endpoint
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - host
+              - path
+            properties:
+              host:
+                $ref: "#/definitions/host"
+                description: Host the comments reside on
+              path:
+                $ref: "#/definitions/path"
+                description: Path of the page the comments reside on
+      responses:
+        200:
+          description: Comment and commenter list
+          schema:
+            type: object
+            properties:
+              pageInfo:
+                description: Page info
+                $ref: "#/definitions/pageInfo"
+              comments:
+                description: Comments on the page
+                type: array
+                items:
+                  $ref: "#/definitions/comment"
+              commenters:
+                description: Commenters, who authored comments on the page
+                type: array
+                items:
+                  $ref: "#/definitions/commenter"
+
+    put:
+      operationId: EmbedCommentNew
+      summary: Add a new comment
+      tags:
+        - ApiEmbed
+      # Security will be enforced directly on the endpoint
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - host
+              - path
+              - markdown
+            properties:
+              host:
+                description: Host the page resides on
+                $ref: "#/definitions/host"
+              path:
+                description: Path to the page to create a comment on
+                $ref: "#/definitions/path"
+              unregistered:
+                type: boolean
+                description: Whether the comment is submitted without registration. If false, valid authentication must be provided with the request
+              authorName:
+                type: string
+                maxLength: 63
+                description: Optional name of the author in case unregistered is true, otherwise ignored
+              parentId:
+                description: Optional ID of the parent comment for the new one. If omitted, a root comment will be added
+                type: string
+                format: uuid
+              markdown:
+                description: Comment text in the markdown format
+                type: string
+                minLength: 1
+                maxLength: 1048576 # 1 MiB
+                x-isnullable: false
+      responses:
+        200:
+          description: Comment is added
+          schema:
+            type: object
+            properties:
+              comment:
+                description: Added comment
+                $ref: "#/definitions/comment"
+              commenter:
+                description: Commenter that corresponds to the current user
+                $ref: "#/definitions/commenter"
+
+  /embed/comments/preview:
+    post:
+      operationId: EmbedCommentPreview
+      summary: Render the passed comment text in markdown and return as HTML
+      tags:
+        - ApiEmbed
+      # Can also be called without authentication
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - domainId
+              - markdown
+            properties:
+              domainId:
+                description: ID of the domain the page resides on
+                type: string
+                format: uuid
+                x-isnullable: false
+              markdown:
+                description: Comment text in the markdown format
+                type: string
+                minLength: 1
+                maxLength: 1048576 # 1 MiB
+                x-isnullable: false
+      responses:
+        200:
+          description: Rendered HTML is returned
+          schema:
+            type: object
+            properties:
+              html:
+                description: Rendered comment HTML
+                type: string
+
+  /embed/comments/counts:
+    post:
+      operationId: EmbedCommentCount
+      summary: Request comment counts for specified paths on given domain
+      tags:
+        - ApiEmbed
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - host
+              - paths
+            properties:
+              host:
+                $ref: "#/definitions/host"
+              paths:
+                type: array
+                items:
+                  $ref: "#/definitions/path"
+                minItems: 1
+                maxItems: 32
+      responses:
+        200:
+          description: Comment counts per path
+          schema:
+            type: object
+            properties:
+              commentCounts:
+                type: object # map[string]int
+
+  /embed/comments/{uuid}:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: EmbedCommentGet
+      summary: Fetch the specified comment and the related commenter
+      tags:
+        - ApiEmbed
+      security: []
+      responses:
+        200:
+          description: Comment and commenter properties
+          schema:
+            type: object
+            properties:
+              comment:
+                description: Requested comment
+                $ref: "#/definitions/comment"
+              commenter:
+                description: Commenter who authored the comment
+                $ref: "#/definitions/commenter"
+
+    delete:
+      operationId: EmbedCommentDelete
+      summary: Delete specified comment
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      responses:
+        204:
+          description: Comment has been deleted
+
+    put:
+      operationId: EmbedCommentUpdate
+      summary: Update specified comment
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - markdown
+            properties:
+              markdown:
+                description: Comment text in the markdown format
+                type: string
+                minLength: 1
+                maxLength: 1048576 # 1 MiB
+                x-isnullable: false
+      responses:
+        200:
+          description: Comment is updated, the updated comment is returned
+          schema:
+            type: object
+            properties:
+              comment:
+                description: >
+                  Updated comment. NB: Vote direction in the returned comment is always 0
+                $ref: "#/definitions/comment"
+
+  /embed/comments/{uuid}/moderate:
+    post:
+      operationId: EmbedCommentModerate
+      summary: Approve or reject the specified comment
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - approve
+            properties:
+              approve:
+                description: Whether to approve the comment
+                type: boolean
+      responses:
+        204:
+          description: Comment has been updated
+
+  /embed/comments/{uuid}/sticky:
+    post:
+      operationId: EmbedCommentSticky
+      summary: Set the stickiness for specified comment
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - sticky
+            properties:
+              sticky:
+                type: boolean
+                description: New sticky value for the comment
+      responses:
+        204:
+          description: Stickiness has been applied
+
+  /embed/comments/{uuid}/vote:
+    post:
+      operationId: EmbedCommentVote
+      summary: Vote for specified comment
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - direction
+            properties:
+              direction:
+                type: integer
+                format: int8
+                enum:
+                  - -1
+                  - 0
+                  - 1
+                description: Vote direction
+      responses:
+        200:
+          description: Vote has been applied
+          schema:
+            type: object
+            properties:
+              score:
+                type: integer
+                description: The updated comment score
+                x-omitempty: false
+
+  /embed/page/{uuid}:
+    put:
+      operationId: EmbedPageUpdate
+      summary: Update specified page's properties
+      tags:
+        - ApiEmbed
+      security:
+        - userSessionHeader: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - isReadonly
+            properties:
+              isReadonly:
+                type: boolean
+                description: Whether the page is to be made readonly (no new comments are allowed)
+
+      responses:
+        204:
+          description: Page properties have been updated
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Dashboard
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /dashboard/stats/totals:
+    get:
+      operationId: DashboardTotals
+      summary: Get summary (totals) data for the user
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: Dashboard data
+          schema:
+            $ref: "#/definitions/statsTotals"
+
+  /dashboard/stats/daily/{metric}:
+    get:
+      operationId: DashboardDailyStats
+      summary: Get daily statistics for the given metric and the current user and, optionally, specified domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathDailyMetric"
+        - $ref: "#/parameters/queryStatsDays"
+        - $ref: "#/parameters/queryOptionalDomain"
+      responses:
+        200:
+          description: Daily statistical data
+          schema:
+            $ref: "#/definitions/statsDailyCounts"
+
+  /dashboard/stats/pages:
+    get:
+      operationId: DashboardPageStats
+      summary: Get top performing pages by view/comment numbers for the current user and, optionally, specified domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryStatsDays"
+        - $ref: "#/parameters/queryOptionalDomain"
+      responses:
+        200:
+          description: Top performing pages by view/comment numbers
+          schema:
+            type: object
+            properties:
+              views:
+                type: array
+                items:
+                  $ref: "#/definitions/pageStatsItem"
+                description: List of top pages by number of views, sorted in descending order
+              comments:
+                type: array
+                items:
+                  $ref: "#/definitions/pageStatsItem"
+                description: List of top pages by number of comments, sorted in descending order
+
+  /dashboard/stats/views/{dimension}:
+    get:
+      operationId: DashboardPageViewStats
+      summary: Get page view numbers for the given dimension and the current user and, optionally, specified domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathViewStatsDimension"
+        - $ref: "#/parameters/queryStatsDays"
+        - $ref: "#/parameters/queryOptionalDomain"
+      responses:
+        200:
+          description: Page view counts data for the given dimension
+          schema:
+            $ref: "#/definitions/statsDimensionCounts"
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Domains
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /domains:
+    get:
+      operationId: DomainList
+      summary: Get a list of registered domains
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryFilter"
+        - $ref: "#/parameters/queryPageNumber"
+        - in: query
+          name: sortBy
+          type: string
+          enum:
+            - name
+            - host
+            - created
+            - countComments
+            - countViews
+          description: Property to sort results by
+        - $ref: "#/parameters/querySortDesc"
+      responses:
+        200:
+          description: List of domains
+          schema:
+            type: object
+            properties:
+              domains:
+                type: array
+                items:
+                  $ref: "#/definitions/domain"
+                description: Domains the current user has (some) rights to
+              domainUsers:
+                type: array
+                items:
+                  $ref: "#/definitions/domainUser"
+                description: Current user's properties on domains (can be linked to a domain using domainId)
+
+    post:
+      operationId: DomainNew
+      summary: Register a new domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - domain
+            properties:
+              domain:
+                $ref: "#/definitions/domain"
+                description: Domain properties
+              configuration:
+                type: array
+                items:
+                  $ref: "#/definitions/dynamicConfigItem"
+                description: Domain configuration items
+              federatedIdpIds:
+                type: array
+                items:
+                  $ref: "#/definitions/federatedIdpId"
+                description: IDs of federated identity providers enabled for the domain
+              extensions:
+                type: array
+                items:
+                  $ref: "#/definitions/domainExtension"
+                description: List of extensions enabled for the domain, and their configurations
+      responses:
+        200:
+          description: Domain added successfully
+          schema:
+            $ref: "#/definitions/domain"
+            description: The added domain
+
+  /domains/count:
+    get:
+      operationId: DomainCount
+      summary: Get number of domains available to the current user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: query
+          name: owner
+          type: boolean
+          description: >
+            Only include domains where the current user is an owner. Ignored if moderator is true because every owner is
+            also a moderator
+        - in: query
+          name: moderator
+          type: boolean
+          description: Only include domains where the current user is a moderator
+      responses:
+        200:
+          description: Number of domains
+          schema:
+            type: integer
+
+  /domains/{uuid}:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: DomainGet
+      summary: Get properties of a domain
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: Domain properties
+          schema:
+            type: object
+            properties:
+              domain:
+                $ref: "#/definitions/domain"
+                description: Domain properties
+              domainUser:
+                $ref: "#/definitions/domainUser"
+                description: Current user's properties on the domain (only when there is one)
+              configuration:
+                type: array
+                items:
+                  $ref: "#/definitions/dynamicConfigItem"
+                description: Domain configuration items
+              federatedIdpIds:
+                type: array
+                items:
+                  $ref: "#/definitions/federatedIdpId"
+                description: IDs of federated identity providers enabled for the domain
+              extensions:
+                type: array
+                items:
+                  $ref: "#/definitions/domainExtension"
+                description: List of extensions enabled for the domain, and their configurations
+              attributes:
+                $ref: "#/definitions/keyValueMap"
+                description: Domain's attributes, only for superuser
+
+    put:
+      operationId: DomainUpdate
+      summary: Update properties of specified domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - domain
+            properties:
+              domain:
+                $ref: "#/definitions/domain"
+                description: Domain properties
+              configuration:
+                type: array
+                items:
+                  $ref: "#/definitions/dynamicConfigItem"
+                description: Domain configuration items
+              federatedIdpIds:
+                type: array
+                items:
+                  $ref: "#/definitions/federatedIdpId"
+                description: IDs of federated identity providers enabled for the domain
+              extensions:
+                type: array
+                items:
+                  $ref: "#/definitions/domainExtension"
+                description: List of extensions enabled for the domain, and their configurations
+      responses:
+        200:
+          description: Domain properties have been updated
+          schema:
+            $ref: "#/definitions/domain"
+            description: The updated domain
+
+    delete:
+      operationId: DomainDelete
+      summary: Delete a domain
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: Domain has been deleted
+
+  /domains/{uuid}/clear:
+    delete:
+      operationId: DomainClear
+      summary: Clear all domain's pages/comments/votes/views
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+      responses:
+        204:
+          description: Domain has been cleared
+
+  /domains/{uuid}/purge:
+    delete:
+      operationId: DomainPurge
+      summary: Permanently remove all deleted domain's comments and/or comments by deleted users
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              markedDeleted:
+                type: boolean
+                description: Whether to remove comments marked as deleted
+              userCreatedDeleted:
+                type: boolean
+                description: Whether to remove comments written by users who are now deleted
+      responses:
+        200:
+          description: Domain has been purged
+          schema:
+            type: object
+            required:
+              - commentCount
+            properties:
+              commentCount:
+                type: integer
+                description: Total number of deleted comments
+                x-isnullable: false
+
+  /domains/{uuid}/readonly:
+    put:
+      operationId: DomainReadonly
+      summary: Set the domain's readonly state
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - readonly
+            properties:
+              readonly:
+                type: boolean
+                description: Readonly status to set
+      responses:
+        204:
+          description: Domain status has been set
+
+  /domains/{uuid}/export:
+    get:
+      operationId: DomainExport
+      summary: Export domain data and download as a gzip-archive file
+      tags:
+        - ApiGeneral
+      produces:
+        - application/gzip
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+      responses:
+        200:
+          description: Export file
+          schema:
+            type: file
+          headers:
+            Content-Disposition:
+              type: string
+
+  /domains/{uuid}/import/{source}:
+    post:
+      operationId: DomainImport
+      summary: Import domain data (commenters, pages, comments) from a data dump
+      tags:
+        - ApiGeneral
+      consumes:
+        - multipart/form-data
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - $ref: "#/parameters/pathImportSource"
+        - in: formData
+          name: data
+          type: file
+          maxLength: 10485760 # 10 MiB
+          required: true
+          description: Import data file
+      responses:
+        200:
+          description: Import completed successfully
+          schema:
+            $ref: "#/definitions/importResult"
+
+  /domains/{uuid}/sso/new:
+    post:
+      operationId: DomainSsoSecretNew
+      summary: Generate an SSO secret for specified domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+      responses:
+        200:
+          description: SSO secret has been generated for the domain
+          schema:
+            type: object
+            properties:
+              ssoSecret:
+                type: string
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Domain pages
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /domain-pages:
+    get:
+      operationId: DomainPageList
+      summary: Get a list of pages for a specific domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+        - $ref: "#/parameters/queryFilter"
+        - $ref: "#/parameters/queryPageNumber"
+        - in: query
+          name: sortBy
+          type: string
+          enum:
+            - path
+            - title
+            - created
+            - countComments
+            - countViews
+          description: Property to sort results by
+        - $ref: "#/parameters/querySortDesc"
+      responses:
+        200:
+          description: List of domain pages
+          schema:
+            type: object
+            properties:
+              pages:
+                type: array
+                items:
+                  $ref: "#/definitions/domainPage"
+                description: List of domain pages
+
+  /domain-pages/{uuid}:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: DomainPageGet
+      summary: Get properties of a domain page
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: Domain page properties
+          schema:
+            type: object
+            properties:
+              page:
+                $ref: "#/definitions/domainPage"
+                description: Domain page properties
+
+    put:
+      operationId: DomainPageUpdate
+      summary: Update properties of specified domain page
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/domainPage"
+      responses:
+        204:
+          description: Domain page properties have been updated
+
+    delete:
+      operationId: DomainPageDelete
+      summary: Delete the specified domain page, including dependent objects (comments, page views)
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: Domain page has been deleted
+
+  /domain-pages/{uuid}/move:
+    post:
+      operationId: DomainPageMoveData
+      summary: >
+        Move the page's dependent data (comments, views) onto another page, then remove the source page. Only available
+        to domain owners and superusers
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - targetPageId
+            properties:
+              targetPageId:
+                description: ID of the domain page to move dependent data to. The page must reside on the same domain as the source page
+                type: string
+                format: uuid
+                x-isnullable: false
+      responses:
+        204:
+          description: Domain page data has been moved onto the target page, and the source page is removed
+
+  /domain-pages/{uuid}/title:
+    post:
+      operationId: DomainPageUpdateTitle
+      summary: Update the title of a domain page by inspecting the corresponding URL. Only available to domain owners and superusers
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+      responses:
+        200:
+          description: Domain page title has been fetched and, possibly, updated
+          schema:
+            type: object
+            properties:
+              changed:
+                type: boolean
+                description: Whether the title was changed
+                x-omitempty: false
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Comments
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /comments:
+    get:
+      operationId: CommentList
+      summary: Get a list of comments and commenters for the given domain and, if specified, page
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+        - in: query
+          name: pageId
+          required: false
+          description: Optional domain page ID to filter comments by
+          type: string
+          format: uuid
+        - in: query
+          name: userId
+          required: false
+          description: Optional user ID to filter comments by
+          type: string
+          format: uuid
+        - in: query
+          name: approved
+          type: boolean
+          required: false
+          description: Whether to include approved comments
+        - in: query
+          name: pending
+          type: boolean
+          required: false
+          description: Whether to include comments pending moderation
+        - in: query
+          name: rejected
+          type: boolean
+          required: false
+          description: Whether to include rejected comments
+        - in: query
+          name: deleted
+          type: boolean
+          required: false
+          description: Whether to include deleted comments
+        - $ref: "#/parameters/queryFilter"
+        - $ref: "#/parameters/queryPageNumber"
+        - in: query
+          name: sortBy
+          type: string
+          enum:
+            - created
+            - score
+          description: Property to sort results by
+        - $ref: "#/parameters/querySortDesc"
+      responses:
+        200:
+          description: Comment and commenter list
+          schema:
+            type: object
+            properties:
+              comments:
+                description: Comments on the page
+                type: array
+                items:
+                  $ref: "#/definitions/comment"
+              commenters:
+                description: Commenters, who authored the comments
+                type: array
+                items:
+                  $ref: "#/definitions/commenter"
+
+  /comments/count:
+    get:
+      operationId: CommentCount
+      summary: Get the number of comments
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+        - in: query
+          name: pageId
+          required: false
+          description: Optional domain page ID to filter comments by
+          type: string
+          format: uuid
+        - in: query
+          name: userId
+          required: false
+          description: Optional user ID to filter comments by
+          type: string
+          format: uuid
+        - in: query
+          name: approved
+          type: boolean
+          required: false
+          description: Whether to include approved comments
+        - in: query
+          name: pending
+          type: boolean
+          required: false
+          description: Whether to include comments pending moderation
+        - in: query
+          name: rejected
+          type: boolean
+          required: false
+          description: Whether to include rejected comments
+        - in: query
+          name: deleted
+          type: boolean
+          required: false
+          description: Whether to include deleted comments
+      responses:
+        200:
+          description: Number of comments matching the criteria
+          schema:
+            type: integer
+            x-omitempty: false
+
+  /comments/{uuid}:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: CommentGet
+      summary: Get the properties of the specified comment
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: Comment
+          schema:
+            type: object
+            properties:
+              comment:
+                $ref: "#/definitions/comment"
+                description: Comment properties
+              commenter:
+                $ref: "#/definitions/commenter"
+                description: Commenter who authored the comment (optional, may not exist anymore)
+              moderator:
+                $ref: "#/definitions/user"
+                description: User who moderated the comment (only when the current user is owner or superuser)
+              deleter:
+                $ref: "#/definitions/user"
+                description: User who authored the comment (only when the comment is deleted and the current user is owner or superuser)
+              editor:
+                $ref: "#/definitions/user"
+                description: User who edited the comment (only when the comment is edited and the current user is owner or superuser)
+              page:
+                $ref: "#/definitions/domainPage"
+                description: Domain page the comment is on
+
+    delete:
+      operationId: CommentDelete
+      summary: Delete the specified comment
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: Comment has been deleted
+
+    post:
+      operationId: CommentModerate
+      summary: Moderate the specified comment
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - pending
+              - approve
+            properties:
+              pending:
+                description: Whether the comment is pending moderation
+                type: boolean
+              approve:
+                description: Whether to approve the comment
+                type: boolean
+      responses:
+        204:
+          description: Comment has been updated
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Domain users
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /domain-users:
+    get:
+      operationId: DomainUserList
+      summary: Get a list of domain users for a specific domain
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+        - $ref: "#/parameters/queryFilter"
+        - $ref: "#/parameters/queryPageNumber"
+        - in: query
+          name: sortBy
+          type: string
+          enum:
+            - email
+            - name
+            - created
+          description: Property to sort results by
+        - $ref: "#/parameters/querySortDesc"
+      responses:
+        200:
+          description: List of domain users
+          schema:
+            type: object
+            properties:
+              domainUsers:
+                type: array
+                items:
+                  $ref: "#/definitions/domainUser"
+                description: List of domain users
+              users:
+                type: array
+                items:
+                  $ref: "#/definitions/user"
+                description: List of users corresponding to domainUsers (can be matched by userId)
+
+  /domain-users/{uuid}:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: DomainUserGet
+      summary: Get properties of the specified domain user
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+      responses:
+        200:
+          description: Domain user properties
+          schema:
+            type: object
+            properties:
+              domainUser:
+                $ref: "#/definitions/domainUser"
+                description: Domain user properties
+              user:
+                $ref: "#/definitions/user"
+                description: Properties of the user corresponding to domainUser
+
+
+    put:
+      operationId: DomainUserUpdate
+      summary: Update properties of the specified domain user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - domainId
+            properties:
+              domainId:
+                type: string
+                format: uuid
+                description: Domain ID
+              role:
+                $ref: "#/definitions/domainUserRole"
+                description: Role of the user
+              notifyReplies:
+                type: boolean
+                description: Whether the user is to be notified about replies to their comments
+              notifyModerator:
+                type: boolean
+                description: Whether the user is to receive moderator notifications
+              notifyCommentStatus:
+                type: boolean
+                description: Whether the user is to be notified about status changes (approved/rejected) of their comments
+      responses:
+        204:
+          description: Domain user properties have been updated
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Users
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /users:
+    get:
+      operationId: UserList
+      summary: Get a list of users
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryFilter"
+        - $ref: "#/parameters/queryPageNumber"
+        - in: query
+          name: sortBy
+          type: string
+          enum:
+            - email
+            - name
+            - created
+            - federatedIdP
+          description: Property to sort results by
+        - $ref: "#/parameters/querySortDesc"
+      responses:
+        200:
+          description: User list
+          schema:
+            type: object
+            properties:
+              users:
+                description: User list
+                type: array
+                items:
+                  $ref: "#/definitions/user"
+
+  /users/{uuid}:
+    parameters:
+    - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: UserGet
+      summary: Get properties of a user, including domain users in domains the current user has moderator/owner rights to
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: User properties
+          schema:
+            type: object
+            properties:
+              user:
+                $ref: "#/definitions/user"
+              attributes:
+                $ref: "#/definitions/keyValueMap"
+                description: User's attributes
+              domainUsers:
+                type: array
+                items:
+                  $ref: "#/definitions/domainUser"
+                description: Current user's properties on domains (can be linked to a domain using domainId)
+              domains:
+                type: array
+                items:
+                  $ref: "#/definitions/domain"
+                description: Domains the current user has moderator/owner rights to
+
+    put:
+      operationId: UserUpdate
+      summary: Update properties of a user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - user
+            properties:
+              user:
+                $ref: "#/definitions/user"
+                description: User properties
+      responses:
+        200:
+          description: User has been updated
+          schema:
+            type: object
+            properties:
+              user:
+                $ref: "#/definitions/user"
+                description: The updated user
+
+    delete:
+      operationId: UserDelete
+      summary: Delete a user
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              deleteComments:
+                type: boolean
+                description: Whether to delete all comments created by the user
+              purgeComments:
+                type: boolean
+                description: Whether to permanently delete all comments, including replies. Ignored if deleteComments is false
+      responses:
+        200:
+          description: User has been deleted
+          schema:
+            type: object
+            properties:
+              countDeletedComments:
+                type: integer
+                description: Number of deleted comments (if opted in for deletion)
+                x-omitempty: false
+
+  /users/{uuid}/sessions:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    get:
+      operationId: UserSessionList
+      summary: List all sessions of a user
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/queryPageNumber"
+      responses:
+        200:
+          description: User sessions
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/userSession"
+
+    put:
+      operationId: UserSessionsExpire
+      summary: Expire all user's sessions
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: All sessions have been expired
+
+  /users/{uuid}/ban:
+    post:
+      operationId: UserBan
+      summary: Ban or unban a user
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - ban
+            properties:
+              ban:
+                type: boolean
+                description: Whether to ban (true) or unban (false) the user
+              deleteComments:
+                type: boolean
+                description: Whether to remove all comments from the user (only applies if ban is true, otherwise ignored)
+              purgeComments:
+                type: boolean
+                description: Whether to permanently delete all comments, including replies. Ignored if ban or deleteComments is false
+      responses:
+        200:
+          description: User has been (un)banned
+          schema:
+            type: object
+            properties:
+              countDeletedComments:
+                type: integer
+                description: Number of deleted comments (if opted in for deletion)
+                x-omitempty: false
+
+  /users/{uuid}/unlock:
+    post:
+      operationId: UserUnlock
+      summary: Unlock a user
+      tags:
+        - ApiGeneral
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+      responses:
+        204:
+          description: User has been unlocked
+
+  /users/{uuid}/avatar:
+    get:
+      operationId: UserAvatarGet
+      summary: Get an avatar for given user in JPEG format
+      tags:
+        - ApiGeneral
+      security: []
+      produces:
+        - image/jpeg
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: query
+          name: size
+          required: false
+          type: string
+          enum:
+            - S
+            - M
+            - L
+          default: S
+          description: Avatar size
+      responses:
+        200:
+          description: User avatar in the JPEG format
+          schema:
+            type: file
+        204:
+          description: User has no avatar
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Configuration
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /config:
+    get:
+      operationId: ConfigGet
+      summary: Obtain instance configuration
+      tags:
+        - ApiGeneral
+      security: []
+      responses:
+        200:
+          description: Instance configuration
+          schema:
+            $ref: "#/definitions/instanceConfig"
+
+    patch:
+      operationId: ConfigDynamicUpdate
+      summary: Update dynamic instance configuration items
+      tags:
+        - ApiGeneral
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/dynamicConfigItem"
+            description: Instance configuration items to modify. Omitted items will not be modified
+      responses:
+        204:
+          description: Dynamic instance configuration has been updated
+
+    delete:
+      operationId: ConfigDynamicReset
+      summary: Reset the dynamic instance configuration to its defaults
+      tags:
+        - ApiGeneral
+      responses:
+        204:
+          description: Dynamic instance configuration has been reset
+
+  /config/versions:
+    get:
+      operationId: ConfigVersionsGet
+      summary: >
+        Get the current and the latest version info. Minimal access level: superuser
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: Version info
+          schema:
+            type: object
+            properties:
+              current:
+                type: string
+                description: Current Comentario version
+              latestRelease:
+                $ref: "#/definitions/releaseMetadata"
+                description: Latest stable Comentario release, if any
+              isUpgradable:
+                type: boolean
+                description: Whether the latestStable > current
+                x-omitempty: false
+
+  /config/extensions:
+    get:
+      operationId: ConfigExtensionsGet
+      summary: Obtain a list of enabled extensions
+      tags:
+        - ApiGeneral
+      responses:
+        200:
+          description: List of enabled extensions
+          schema:
+            type: object
+            properties:
+              extensions:
+                type: array
+                items:
+                  $ref: "#/definitions/domainExtension"
+                description: List of extensions, with a default configuration
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # RSS
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /rss/comments:
+    get:
+      operationId: RssComments
+      summary: Get an RSS feed of comments for the given domain, page, commenter
+      tags:
+        - ApiRss
+      security: []
+      produces:
+        - application/rss+xml
+      parameters:
+        - $ref: "#/parameters/queryDomainId"
+        - in: query
+          name: page
+          required: false
+          description: Optional domain page ID to filter comments by
+          type: string
+          format: uuid
+        - in: query
+          name: author
+          required: false
+          description: Optional user ID who authored the comments, to filter comments by
+          type: string
+          format: uuid
+        - in: query
+          name: replyToUser
+          required: false
+          description: Optional user ID whose comments are replied to, to filter comments by
+          type: string
+          format: uuid
+      responses:
+        200:
+          description: Comment RSS feed
+          schema:
+            type: object
+
+  #---------------------------------------------------------------------------------------------------------------------
+  # Testing endpoints
+  # These endpoints are only available during the test cycle and never in production
+  #---------------------------------------------------------------------------------------------------------------------
+
+  /e2e/reset:
+    post:
+      operationId: E2eReset
+      summary: Reset the backend (all settings and database) to testing defaults
+      tags:
+        - ApiE2e
+      security: []
+      responses:
+        204:
+          description: The backend has been successfully reset
+
+  /e2e/config/dynamic:
+    put:
+      operationId: E2eConfigDynamicUpdate
+      summary: Update the given dynamic instance configuration items
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/dynamicConfigItem"
+      responses:
+        204:
+          description: Dynamic instance configuration item has been updated
+
+  /e2e/config/versions/latestRelease:
+    put:
+      operationId: E2eConfigVersionLatestReleaseUpdate
+      summary: Set the latest release returned by the app
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/releaseMetadata"
+      responses:
+        204:
+          description: Dynamic instance configuration item has been updated
+
+  /e2e/domains/{uuid}:
+    parameters:
+      - $ref: "#/parameters/pathUuid"
+
+    patch:
+      operationId: E2eDomainPatch
+      summary: Patch properties of specified domain. The body must be JSON with domain properties to patch
+      tags:
+        - ApiE2e
+      security: []
+      responses:
+        204:
+          description: Domain properties have been updated
+
+  /e2e/domains/{uuid}/attrs:
+    put:
+      operationId: E2eDomainUpdateAttrs
+      summary: Update the attributes of specified domain
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - values
+            properties:
+              values:
+                $ref: "#/definitions/keyValueMap"
+                description: Attributes to set for the domain
+      responses:
+        204:
+          description: Domain's attributes have been updated
+
+  /e2e/domains/{uuid}/config:
+    put:
+      operationId: E2eDomainConfigUpdate
+      summary: Update the given dynamic configuration item values for the specified domain
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/dynamicConfigItem"
+      responses:
+        204:
+          description: Domain configuration item has been updated
+
+  /e2e/domains/{uuid}/idps:
+    put:
+      operationId: E2eDomainUpdateIdps
+      summary: Update the list of federated IdPs of specified domain
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/federatedIdpId"
+            description: IDs of federated identity providers enabled for the domain
+      responses:
+        204:
+          description: Domain's IdP list has been updated
+
+  /e2e/mails:
+    get:
+      operationId: E2eMailsGet
+      summary: Obtain a list of all sent emails
+      tags:
+        - ApiE2e
+      security: []
+      responses:
+        200:
+          description: List of sent emails
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                headers:
+                  type: object
+                  x-omitempty: false
+                embedFiles:
+                  type: array
+                  items:
+                    type: string
+                  x-omitempty: false
+                body:
+                  type: string
+                  x-omitempty: false
+                succeeded:
+                  type: boolean
+                  x-omitempty: false
+
+  /e2e/oauth/login/{uuid}:
+    get:
+      operationId: E2eOAuthFederatedLogin
+      summary: Log in as a federated user with the given ID into Admin UI
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+      responses:
+        200:
+          description: Login successful
+          schema:
+            $ref: "#/definitions/principal"
+
+  /e2e/oauth/{uuid}/sso/noninteractive:
+    get:
+      operationId: E2eOAuthSSONonInteractive
+      summary: Perform a fake non-interactive SSO-auth for a domain with the given UUID
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - $ref: "#/parameters/queryToken"
+        - in: query
+          name: hmac
+          required: true
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: '[0-9a-f]{64}'
+          description: HMAC signature for token
+      responses:
+        302:
+          description: Auth successful, redirecting to the callback URL
+          headers:
+            Location:
+              type: string
+
+  /e2e/users/{uuid}/attrs:
+    put:
+      operationId: E2eUserUpdateAttrs
+      summary: Update the attributes of specified user
+      tags:
+        - ApiE2e
+      security: []
+      parameters:
+        - $ref: "#/parameters/pathUuid"
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - values
+            properties:
+              values:
+                $ref: "#/definitions/keyValueMap"
+                description: Attributes to set for the user
+      responses:
+        204:
+          description: User's attributes have been updated

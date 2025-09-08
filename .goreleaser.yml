@@ -1,0 +1,131 @@
+project_name: comentario
+version: 2
+
+builds:
+  # Dynamically linked binary
+  - id: comentario
+    binary: comentario
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    env:
+      # Force-enable cgo for every dynamically-linked build
+      - CGO_ENABLED=1
+    overrides:
+      # ARM builds require an explicit gcc specification
+      - goos: linux
+        goarch: arm
+        goarm: 6
+        env:
+          - CC=arm-linux-gnueabi-gcc
+      - goos: linux
+        goarch: arm64
+        goarm64: v8.0
+        env:
+          - CC=aarch64-linux-gnu-gcc
+
+  # Statically linked binary
+  - id: comentario-static
+    binary: comentario
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: comentario-tarball
+    ids:
+      - comentario
+    wrap_in_directory: true
+    files:
+      - CHANGELOG.md
+      - LICENSE
+      - README.md
+      - src: build/frontend
+        dst: frontend
+      - db
+      - templates
+      - src: resources/etc
+        dst: etc
+  - id: comentario-static-tarball
+    ids:
+      - comentario-static
+    name_template: '{{ .ProjectName }}-static_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    wrap_in_directory: true
+    files:
+      - CHANGELOG.md
+      - LICENSE
+      - README.md
+      - src: build/frontend
+        dst: frontend
+      - db
+      - templates
+      - src: resources/etc
+        dst: etc
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ .Version }}-next-{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^ci:'
+      - '^code:'
+      - '^docs:'
+      - '^test:'
+      - '^wip:'
+
+nfpms:
+  - id: comentario
+    package_name: comentario
+    ids:
+      # We make packages only from a dynamically-linked binary
+      - comentario
+    vendor: Dmitry Kann
+    homepage: https://comentario.app/
+    maintainer: Dmitry Kann <yktooo@gmail.com>
+    description: Fast, flexible, and powerful free comment server for web pages.
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    dependencies:
+      - libc6
+      - systemd
+    recommends:
+      - postgresql
+    suggests: []
+    conflicts: []
+    bindir: /usr/bin
+    contents:
+      - src: db
+        dst: /usr/lib/comentario/db
+      - src: templates
+        dst: /usr/lib/comentario/templates
+      - src: build/frontend
+        dst: /usr/lib/comentario/frontend
+      - src: resources/etc
+        dst: /etc
+        type: config|noreplace
+      - src: resources/systemd
+        dst: /usr/lib/systemd
+    scripts:
+      postinstall: resources/pkg-scripts/post-install
+      preremove:   resources/pkg-scripts/pre-remove
+
+    overrides:
+      rpm:
+        dependencies:
+          - glibc
+          - systemd

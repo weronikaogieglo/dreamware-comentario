@@ -1,0 +1,17 @@
+@let anon = isAnonymous();
+<div [class.avatar-anonymous]="anon"
+     [class.avatar-initial]="!anon && !imageSrc()"
+     [style.background-color]="anon ? null : user()?.colourIndex | hashColour"
+     class="avatar-backdrop size-{{ size().toLowerCase() }}">
+    @if (anon) {
+        <!-- Anonymous user -->
+        <fa-icon [icon]="faUser"/>
+    } @else if (imageSrc()) {
+        <!-- User avatar image -->
+        <!--suppress AngularNgOptimizedImage -->
+        <img [src]="imageSrc()!" [width]="pixelSize()" [height]="pixelSize()" alt="">
+    } @else {
+        <!-- User initial in case there's no avatar -->
+        <span>{{ initial() }}</span>
+    }
+</div>

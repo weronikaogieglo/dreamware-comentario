@@ -1,0 +1,80 @@
+<!-- Heading -->
+<h1 class="mb-0" i18n="heading">Edit domain user</h1>
+
+<!-- User email -->
+<div class="mb-3" id="domain-user-email">{{ email }}</div>
+
+<!-- Info text if the role is unchangeable -->
+@if (form.controls.role.disabled) {
+    <app-info-block class="mb-3" i18n>You cannot change your own role unless you're a superuser.</app-info-block>
+}
+
+<!-- Domain user edit form -->
+<form [formGroup]="form" [appSpinner]="loading.active" (ngSubmit)="submit()" (keydown.control.enter)="submit()" spinnerSize="lg">
+    <fieldset [disabled]="loading.active || saving.active">
+        <!-- User role -->
+        <div class="mb-3 row">
+            <div class="col-sm-3">
+                <span class="colon fw-bold" i18n>User role</span>
+                <app-info-icon docLink="kb/permissions/roles/" class="ms-2"/>
+            </div>
+            <div class="col-sm-9">
+                <!-- Owner -->
+                <div class="form-check mb-3">
+                    <input formControlName="role" class="form-check-input" type="radio" id="role-owner" value="owner">
+                    <label class="form-check-label" for="role-owner" i18n><app-domain-user-role-badge role="owner"/></label>
+                    <div class="form-text" i18n>Domain owners can change domain settings or delete the domain. They can also manage other domain users.</div>
+                </div>
+                <!-- Moderator -->
+                <div class="form-check mb-3">
+                    <input formControlName="role" class="form-check-input" type="radio" id="role-moderator" value="moderator">
+                    <label class="form-check-label" for="role-moderator" i18n><app-domain-user-role-badge role="moderator"/></label>
+                    <div class="form-text" i18n>Domain moderators can approve or reject comments on any page of the domain. They cannot see user list or change domain settings.</div>
+                </div>
+                <!-- Commenter -->
+                <div class="form-check mb-3">
+                    <input formControlName="role" class="form-check-input" type="radio" id="role-commenter" value="commenter">
+                    <label class="form-check-label" for="role-commenter" i18n><app-domain-user-role-badge role="commenter"/></label>
+                    <div class="form-text" i18n>Commenters can write comments on any page of the domain (except locked ones). This is the default role a user gets after registration.</div>
+                </div>
+                <!-- Read-only -->
+                <div class="form-check mb-3">
+                    <input formControlName="role" class="form-check-input" type="radio" id="role-readonly" value="readonly">
+                    <label class="form-check-label" for="role-readonly" i18n><app-domain-user-role-badge role="readonly"/></label>
+                    <div class="form-text" i18n>Read-only users can only view comments. Use this role to prevent a user from writing any comments.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="mb-3 row">
+            <div class="col-sm-3">
+                <span class="colon fw-bold" i18n>Settings</span>
+            </div>
+            <div class="col-sm-9">
+                <!-- Reply notifications -->
+                <div class="form-check form-switch">
+                    <input formControlName="notifyReplies" class="form-check-input" type="checkbox" id="notify-replies">
+                    <label class="form-check-label" for="notify-replies" i18n>Reply notifications</label>
+                </div>
+                <!-- Moderator notifications -->
+                <div class="form-check form-switch">
+                    <input formControlName="notifyModerator" class="form-check-input" type="checkbox" id="notify-moderator">
+                    <label class="form-check-label" for="notify-moderator" i18n>Moderator notifications</label>
+                    <div class="form-text" i18n>Only relevant if the user is a moderator.</div>
+                </div>
+                <!-- Comment status notifications -->
+                <div class="form-check form-switch">
+                    <input formControlName="notifyCommentStatus" class="form-check-input" type="checkbox" id="notify-comment-status">
+                    <label class="form-check-label" for="notify-comment-status" i18n>Comment status notifications</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="form-footer">
+            <a routerLink=".." class="btn btn-link" i18n="action">Cancel</a>
+            <button [appSpinner]="saving.active" type="submit" class="btn btn-primary" i18n="action">Save</button>
+        </div>
+    </fieldset>
+</form>

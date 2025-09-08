@@ -1,0 +1,201 @@
+@if (principal) {
+    <!-- Heading -->
+    <h1 i18n="heading">My profile</h1>
+
+    <!-- Profile form -->
+    <section>
+        <form [formGroup]="userForm" (ngSubmit)="submit()" id="profileForm">
+            <fieldset [disabled]="saving.active" id="profileFields" class="row gy-3">
+                <!-- User ID -->
+                <div class="col-md-6">
+                    <label for="currentUserId" class="form-label colon" i18n>User ID</label>
+                    <div class="input-group">
+                        <input [value]="principal.id" type="text" class="form-control" id="currentUserId" disabled>
+                        <button [appCopyText]="principal.id" ngbTooltip
+                                class="btn btn-outline-secondary" type="button" title="Copy" i18n-title>
+                            <fa-icon [icon]="faCopy"/>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Email -->
+                <div class="col-md-6">
+                    <label for="email" class="form-label colon" i18n>Email</label>
+                    <div class="input-group">
+                        <input formControlName="email" type="email" class="form-control" id="email" size="45"
+                               autocomplete="email" aria-describedby="emailUpdateHelp">
+                        <!-- Update email button, local user only -->
+                        @if (updateEmailRoute; as r) {
+                            <a [routerLink]="r" class="btn btn-outline-secondary"
+                               title="Update email" i18n><fa-icon [icon]="faPencil"/></a>
+                        }
+                    </div>
+                    <!-- Update email info text if cannot edit -->
+                    @if (principal.isLocal && !updateEmailRoute) {
+                        <div id="emailUpdateHelp" class="form-text"
+                             i18n>Contact your system administrator to change the email.</div>
+                    }
+                </div>
+
+                <!-- Name -->
+                <div class="col-md-6">
+                    <label for="name" class="form-label colon" i18n>Name</label>
+                    <input appValidatable formControlName="name" type="text" class="form-control" id="name"
+                           autocomplete="name" placeholder="John Doe" i18n-placeholder>
+                    <div class="invalid-feedback" i18n>Please enter a valid name.</div>
+                </div>
+
+                <!-- Website URL -->
+                <div class="col-md-6">
+                    <label for="websiteUrl" class="form-label colon" i18n>Website URL</label>
+                    <input appValidatable formControlName="websiteUrl" type="url" class="form-control" id="websiteUrl"
+                           autocomplete="url" placeholder="http://example.com">
+                    <!-- Invalid feedback -->
+                    <div class="invalid-feedback" i18n>Please enter a valid URL.</div>
+                </div>
+
+                <!-- Preferred language -->
+                <div class="col-md-6">
+                    <label for="lang" class="form-label colon" i18n>Preferred language</label>
+                    <select appValidatable formControlName="langId" class="form-select" id="lang">
+                        @for (lang of languages; track lang.id) {
+                            <option [value]="lang.id" [class.text-black-50]="!lang.nameEnglish">
+                                <ng-container>{{ lang.nameNative }}</ng-container>
+                                @if (lang.nameEnglish; as n) {<ng-container> ({{ n }})</ng-container>}
+                            </option>
+                        }
+                    </select>
+                    <!-- Invalid feedback -->
+                    <div class="invalid-feedback" i18n>Please select a value.</div>
+                </div>
+            </fieldset>
+
+            <!-- Change password controls -->
+            @if (principal.isLocal) {
+                <fieldset [disabled]="saving.active" id="changeProfileFields" class="row gy-3 mt-4">
+                    <!-- Section heading -->
+                    <div class="lead fw-bold" i18n>Change password</div>
+
+                    <!-- New password -->
+                    <div class="col-md-6">
+                        <label for="newPassword" class="form-label colon" i18n>New password</label>
+                        <app-password-input formControlName="newPassword" [strong]="true"
+                                            autocomplete="new-password" id="newPassword"
+                                            placeholder="(unchanged)" i18n-placeholder/>
+                    </div>
+
+                    <!-- Current password -->
+                    <div class="col-md-6">
+                        <label for="curPassword" class="form-label colon" i18n>Current password</label>
+                        <app-password-input formControlName="curPassword" [required]="true"
+                                            autocomplete="current-password" id="curPassword"/>
+                    </div>
+                </fieldset>
+            }
+
+            <!-- Avatar -->
+            <fieldset [disabled]="saving.active" id="avatarFields" class="row gy-3 mt-4">
+                <!-- Section heading -->
+                <div class="lead fw-bold" i18n>Avatar</div>
+
+                <!-- Avatar controls -->
+                <div class="col-12" id="user-avatar">
+                    <div class="d-grid d-sm-flex flex-wrap align-items-center gap-2 mb-3">
+                        <!-- Avatar image -->
+                        <div class="px-2 text-center text-sm-start">
+                            <app-user-avatar [user]="principal" [updated]="principalUpdated"
+                                             [avatarOverride]="avatarFile" size="L" id="user-avatar-picture"/>
+                        </div>
+                        <!-- Buttons -->
+                        <button (click)="uploadAvatar()" type="button" class="btn btn-outline-primary" i18n>Upload</button>
+                        <button (click)="removeAvatar()" type="button" class="btn btn-outline-danger" i18n>Remove</button>
+                        <button (click)="downloadGravatar()" [appSpinner]="settingGravatar.active" type="button" class="btn btn-outline-secondary" i18n>Download from Gravatar</button>
+                    </div>
+                    <!-- Avatar info -->
+                    <div class="form-text">
+                        <ng-container i18n>Avatar image should be a JPEG or a PNG image up to 1 MB in size.</ng-container>&ngsp;
+                        <ng-container i18n>A 128×128 pixel image is recommended.</ng-container>&ngsp;
+                        <ng-container i18n>You can also download your profile picture from <a href="https://gravatar.com/" target="_blank" rel="noopener noreferrer">Gravatar</a>.</ng-container>
+                    </div>
+                    <!-- Invisible avatar file input -->
+                    <input #avatarFileInput (change)="avatarSelected()" class="d-none" type="file" id="user-avatar-file">
+                </div>
+            </fieldset>
+
+            <!-- Save button -->
+            <div class="form-footer">
+                <button [appSpinner]="saving.active" [disable]="!userForm.dirty && !avatarChanged" type="submit" class="btn btn-primary" i18n="action">Save</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Plugin items -->
+    @for (plug of plugs; track plug) {
+        <section [id]="plug.pluginId + '-' + plug.location">
+            <!-- Heading -->
+            <div class="lead fw-bold">{{ plug.label }}</div>
+
+            <!-- Component -->
+            <app-plugin-plug [plug]="plug"/>
+        </section>
+    }
+
+    <!-- Danger zone -->
+    <section class="danger text-center p-4">
+        <!-- Collapse link -->
+        <button [class.collapsed]="isDangerZoneCollapsed" [attr.aria-expanded]="!isDangerZoneCollapsed"
+                (click)="collapse.toggle()"
+                type="button" class="btn btn-outline-danger collapse-toggler px-5 mb-2" aria-controls="danger-zone-container">
+            <span class="me-2" i18n>Danger zone</span>
+            <fa-icon [icon]="faAngleDown"/>
+        </button>
+        <!-- Danger zone content -->
+        <div #collapse="ngbCollapse" [(ngbCollapse)]="isDangerZoneCollapsed" id="danger-zone-container">
+            <!-- Delete account -->
+            <section>
+                <h3 i18n="heading">Delete my account</h3>
+
+                <!-- Delete account info -->
+                <p i18n>Here you can terminate your service account.</p>
+
+                <!-- Superuser-specific warning -->
+                @if (principal.isSuperuser) {
+                    <p i18n>Since you are a superuser, you must make sure there are other superuser(s) in the system before you can proceed with deleting your account.</p>
+                }
+
+                <!-- Delete account button -->
+                <button [appConfirm]="deleteAccountDlg"
+                        confirmTitle="Are you absolutely sure you want to delete your account?"
+                        confirmAction="Delete my account"
+                        [confirmIcon]="faSkullCrossbones"
+                        [confirmActionEnabled]="deleteConfirmationForm.controls.agreed.value"
+                        [appSpinner]="deleting.active" type="button" class="btn btn-danger"
+                        (confirmed)="deleteAccount()"
+                        i18n-confirmTitle i18n-confirmAction>
+                    <fa-icon [icon]="faTrashAlt" class="me-1"/>
+                    <ng-container i18n="action">Delete my account</ng-container>
+                </button>
+            </section>
+        </div>
+    </section>
+}
+
+<!-- Delete account confirmation dialog content template -->
+<ng-template #deleteAccountDlg>
+    <p i18n>You will lose your access to Comentario.</p>
+    <form [formGroup]="deleteConfirmationForm">
+        <div class="form-check">
+            <input formControlName="deleteComments" type="checkbox" class="form-check-input" id="del-comments-del-account">
+            <label class="form-check-label" for="del-comments-del-account" i18n>Also delete all my comments</label>
+        </div>
+        <div class="form-check ms-4">
+            <input formControlName="purgeComments" type="checkbox" class="form-check-input" id="purge-comments-del-account">
+            <label class="form-check-label" for="purge-comments-del-account" i18n>Permanently delete all comments, including replies</label>
+        </div>
+        <hr>
+        <div class="form-check">
+            <input formControlName="agreed" type="checkbox" class="form-check-input" id="agreed-del-account">
+            <label class="form-check-label text-danger" for="agreed-del-account" i18n>I understand that this action cannot be undone</label>
+        </div>
+    </form>
+</ng-template>

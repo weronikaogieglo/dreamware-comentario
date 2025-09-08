@@ -1,0 +1,207 @@
+<!-- Header with the badge -->
+<header class="d-flex flex-wrap align-items-center mb-3">
+    <h1 class="mb-0 me-2" i18n="heading">Domain</h1>
+    <app-domain-badge/>
+</header>
+
+<!-- Installation, only for an owner user -->
+@if (domainMeta?.domainUser?.role === 'owner') {
+    <section>
+        <!-- Heading -->
+        <h2 i18n>Installation</h2>
+        <app-domain-install/>
+    </section>
+}
+
+<!-- Properties -->
+<section [appSpinner]="domainLoading.active" spinnerSize="lg">
+    <!-- Heading -->
+    <h2 i18n>Properties</h2>
+
+    @if (domainMeta?.domain; as domain) {
+        <div class="row">
+            <!-- Buttons: only for superuser/owner -->
+            @if (domainMeta!.canManageDomain) {
+                <div class="col-md-4 order-md-last pb-3">
+                    <!-- Edit settings button -->
+                    <a [routerLink]="[Paths.manage.domains, domain.id, 'edit']" class="btn btn-secondary w-100 mb-2">
+                        <fa-icon [icon]="faEdit" class="me-1"/>
+                        <ng-container i18n>Edit settings</ng-container>
+                    </a>
+                    <!-- SSO secret button -->
+                    <a [routerLink]="[Paths.manage.domains, domain.id, 'sso']" [class.disabled]="!domain.authSso"
+                       class="btn btn-outline-secondary w-100 mb-2">
+                        <fa-icon [icon]="faTicket" class="me-1"/>
+                        <ng-container i18n>SSO secret</ng-container>
+                    </a>
+                </div>
+            }
+
+            <!-- Detail table -->
+            <div class="col col-md-8">
+                <dl class="detail-table dt-50" id="domainDetailTable">
+                    <!-- Host -->
+                    <div>
+                        <dt i18n>Host</dt>
+                        <dd><a [appExternalLink]="domain.rootUrl">{{ domain.host }}</a></dd>
+                    </div>
+                    <!-- Name -->
+                    @if (domain.name) {
+                        <div>
+                            <dt i18n>Name</dt>
+                            <dd>{{ domain.name }}</dd>
+                        </div>
+                    }
+                    <!-- Read-only -->
+                    <div>
+                        <dt i18n>Read-only</dt>
+                        <dd>
+                            <app-checkmark [value]="domain.isReadonly"/>
+                        </dd>
+                    </div>
+                    <!-- Default comment sort -->
+                    @if (domain.defaultSort) {
+                        <div>
+                            <dt i18n>Default comment sort</dt>
+                            <dd>{{ domain.defaultSort | commentSort }}</dd>
+                        </div>
+                    }
+                    <!-- Configuration -->
+                    @for (secItems of domainMeta!.config!.bySection | keyvalue; track secItems.key) {
+                        <!-- Section heading -->
+                        <div>
+                            <dt>{{ secItems.key | dynConfigSectionName }}</dt>
+                        </div>
+                        <!-- Section items -->
+                        @for (item of secItems.value; track item.key) {
+                            <div>
+                                <dt class="fw-normal ms-md-3">{{ item.key | dynConfigItemName }}</dt>
+                                <dd><app-dyn-config-item-value [item]="item"/></dd>
+                            </div>
+                        }
+                    }
+                    <!-- Authentication methods -->
+                    <div>
+                        <dt>
+                            <ng-container i18n>Authentication methods</ng-container>
+                            <app-info-icon docLink="configuration/frontend/domain/authentication/" position="right"/>
+                        </dt>
+                        <dd>
+                            <ul class="list-unstyled">
+                                @if (domain.authAnonymous) {
+                                    <li i18n>Commenting without registration</li>
+                                }
+                                @if (domain.authLocal) {
+                                    <li i18n>Local (password-based)</li>
+                                }
+                                @for (idp of fedIdps; track idp.id) {
+                                    <li>
+                                        <app-idp-icon [idpId]="idp.id"/>
+                                        <span class="ms-1">{{ idp.name }}</span>
+                                    </li>
+                                }
+                                @if (domain.authSso) {
+                                    <li>
+                                        @if (domain.ssoNonInteractive) {
+                                            <ng-container i18n>Non-interactive</ng-container>&ngsp;
+                                        }
+                                        <ng-container>Single Sign-On</ng-container>
+                                        <div class="text-truncate ps-3"><i i18n>via</i> {{ domain.ssoUrl }}</div>
+                                    </li>
+                                }
+                            </ul>
+                        </dd>
+                    </div>
+                    <!-- Require moderator approval on comments -->
+                    @if (hasApprovalPolicy) {
+                        <div>
+                            <dt i18n>Require moderator approval on comment, if</dt>
+                            <dd>
+                                <ul class="ps-3 mb-0">
+                                    @if (domain.modAnonymous) {
+                                        <li i18n>Author is unregistered</li>
+                                    }
+                                    @if (domain.modAuthenticated) {
+                                        <li i18n>Author is authenticated</li>
+                                    }
+                                    @if (domain.modNumComments; as n) {
+                                        <li i18n>Author has less than {{ n }} approved comments</li>
+                                    }
+                                    @if (domain.modUserAgeDays; as n) {
+                                        <li i18n>Author is registered less than {{ n }} days ago</li>
+                                    }
+                                    @if (domain.modLinks) {
+                                        <li i18n>Comment contains link</li>
+                                    }
+                                    @if (domain.modImages) {
+                                        <li i18n>Comment contains image</li>
+                                    }
+                                </ul>
+                            </dd>
+                        </div>
+                    }
+                    <!-- Email moderators -->
+                    @if (domain.modNotifyPolicy) {
+                        <div>
+                            <dt i18n>Email moderators</dt>
+                            <dd>{{ domain.modNotifyPolicy | moderatorNotifyPolicy }}</dd>
+                        </div>
+                    }
+                    <!-- Extensions -->
+                    @if (extensions?.length) {
+                        <div>
+                            <dt>
+                                <ng-container i18n>Extensions</ng-container>
+                                <app-info-icon docLink="configuration/frontend/domain/extensions/" position="right"/>
+                            </dt>
+                            <dd>
+                                <ul class="ps-3 mb-0">
+                                    @for (e of extensions; track e.id) {
+                                        <li>{{ e.name }}</li>
+                                    }
+                                </ul>
+                            </dd>
+                        </div>
+                    }
+                    <!-- Created -->
+                    @if (domain.createdTime | datetime; as v) {
+                        <div>
+                            <dt i18n>Created</dt>
+                            <dd>{{ v }}</dd>
+                        </div>
+                    }
+                    <!-- Number of comments -->
+                    @if (domain.countComments! >= 0) {
+                        <div>
+                            <dt i18n>Number of comments</dt>
+                            <dd>{{ domain.countComments | number }}</dd>
+                        </div>
+                    }
+                    <!-- Number of views -->
+                    @if (domain.countViews! >= 0) {
+                        <div>
+                            <dt i18n>Number of views</dt>
+                            <dd>{{ domain.countViews | number }}</dd>
+                        </div>
+                    }
+                    <!-- Comment RSS feed -->
+                    <div>
+                        <dt>
+                            <ng-container i18n>Comment RSS feed</ng-container>
+                            <app-info-icon docLink="kb/rss/" position="right"/>
+                        </dt>
+                        <dd><app-domain-rss-link/></dd>
+                    </div>
+                </dl>
+
+                <!-- Attributes -->
+                @if (domainMeta?.attributes) {
+                    <app-attribute-table [attributes]="domainMeta!.attributes"/>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Placeholder when no data -->
+    @if (!domainMeta?.domain) { <app-no-data/> }
+</section>

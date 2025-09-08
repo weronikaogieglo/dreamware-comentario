@@ -1,0 +1,144 @@
+<app-info-block class="mb-3" i18n>These parameters are either immutable or can only be changed at server startup.</app-info-block>
+
+<dl class="detail-table" id="staticConfigItems">
+    <!-- Base Comentario URL -->
+    <div>
+        <dt i18n>Base Comentario URL</dt>
+        <dd><a [appExternalLink]="cfg.baseUrl">{{ cfg.baseUrl }}</a></dd>
+    </div>
+    <!-- Base documentation URL -->
+    <div>
+        <dt i18n>Base documentation URL</dt>
+        <dd><a [appExternalLink]="cfg.baseDocsUrl">{{ cfg.baseDocsUrl }}</a></dd>
+    </div>
+    <!-- Terms of Service URL -->
+    <div>
+        <dt i18n>Terms of Service URL</dt>
+        <dd><a [appExternalLink]="cfg.termsOfServiceUrl">{{ cfg.termsOfServiceUrl }}</a></dd>
+    </div>
+    <!-- Privacy Policy URL -->
+    <div>
+        <dt i18n>Privacy Policy URL</dt>
+        <dd><a [appExternalLink]="cfg.privacyPolicyUrl">{{ cfg.privacyPolicyUrl }}</a></dd>
+    </div>
+    <!-- Comentario version -->
+    <div>
+        <dt>
+            <span class="position-relative">
+                <ng-container i18n>Comentario version</ng-container>
+                <!-- Updates badge -->
+                @if (isUpgradable) {<app-updates-badge/>}
+            </span>
+        </dt>
+        <dd [class.bg-warning-subtle]="isUpgradable && latestRelease" class="d-flex flex-wrap">
+            <div class="me-3">{{ cfg.version }}</div>
+            @if (isUpgradable === false) {
+                <!-- No upgrade available -->
+                <div class="fst-italic" i18n>No upgrade available.</div>
+            } @else if (isUpgradable && latestRelease) {
+                <!-- Upgrade version link -->
+                <div class="fw-bold">
+                    <a [appExternalLink]="latestRelease.pageUrl">
+                        <ng-container i18n>Upgrade available</ng-container>:&ngsp;
+                        <ng-container>{{ latestRelease.name }}</ng-container>
+                    </a>
+                </div>
+            }
+        </dd>
+    </div>
+    <!-- Build date -->
+    <div>
+        <dt i18n>Build date</dt>
+        <dd>{{ cfg.buildDate | datetime }}</dd>
+    </div>
+    <!-- Current server time -->
+    <div>
+        <dt i18n>Current server time</dt>
+        <dd>{{ cfg.serverTime | datetime }}</dd>
+    </div>
+    <!-- Database version -->
+    <div>
+        <dt i18n>Database version</dt>
+        <dd>{{ cfg.dbVersion }}</dd>
+    </div>
+    <!-- Default UI language ID -->
+    <div>
+        <dt i18n>Default UI language ID</dt>
+        <dd>{{ cfg.defaultLangId }}</dd>
+    </div>
+    <!-- Homepage content URL -->
+    @if (cfg.homeContentUrl; as v) {
+        <div>
+            <dt i18n>Homepage content URL</dt>
+            <dd><a [appExternalLink]="v">{{ v }}</a></dd>
+        </div>
+    }
+    <!-- Configured federated identity providers -->
+    <div>
+        <dt>
+            <ng-container i18n>Configured federated identity providers</ng-container>
+            <app-info-icon docLink="configuration/idps/" class="ms-2"/>
+        </dt>
+        <dd>
+            @if (cfg.federatedIdps?.length) {
+                <ul class="list-unstyled">
+                    @for (idp of cfg.federatedIdps; track idp.id) {
+                        <li>
+                            <app-idp-icon [idpId]="idp.id"/>
+                            <span class="ms-1">{{ idp.name }}</span>
+                        </li>
+                    }
+                </ul>
+            } @else {
+                <i i18n>(none)</i>
+            }
+        </dd>
+    </div>
+    <!-- Max. number of items per page -->
+    <div>
+        <dt i18n>Max. number of items per page</dt>
+        <dd>{{ cfg.resultPageSize | number }}</dd>
+    </div>
+    <!-- Live update enabled -->
+    <div>
+        <dt i18n>Live update enabled</dt>
+        <dd><app-checkmark [value]="cfg.liveUpdateEnabled"/></dd>
+    </div>
+    <!-- Page view statistics enabled -->
+    <div>
+        <dt i18n>Page view statistics enabled</dt>
+        <dd><app-checkmark [value]="cfg.pageViewStatsEnabled"/></dd>
+    </div>
+    <!-- Max. number of days in statistics -->
+    <div>
+        <dt i18n>Max. number of days in statistics</dt>
+        <dd>{{ cfg.pageViewStatsMaxDays | number }}</dd>
+    </div>
+    <!-- Available UI languages -->
+    <div>
+        <dt i18n>Available UI languages</dt>
+        <dd>
+            <ul class="list-unstyled">
+                @for (lang of cfg.uiLanguages; track lang.id) {
+                    <li>
+                        <code>{{ lang.id }}</code>
+                        <span class="ms-1">{{ lang.nameNative }} ({{ lang.nameEnglish }})</span>
+                    </li>
+                }
+            </ul>
+        </dd>
+    </div>
+    <!-- Enabled extensions -->
+    @if (extensions?.length) {
+        <div>
+            <dt i18n>Enabled extensions</dt>
+            <dd>
+                <ul class="ps-3 mb-0">
+                    @for (ext of extensions; track ext.id) {
+                        <li>{{ ext.name }}</li>
+                    }
+                </ul>
+            </dd>
+        </div>
+    }
+</dl>

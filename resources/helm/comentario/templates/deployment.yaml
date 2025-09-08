@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "comentario.fullname" . }}
+  labels:
+    {{- include "comentario.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "comentario.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "comentario.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "comentario.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: secrets-volume
+              mountPath: /comentario-secrets
+          {{- with .Values.comentario.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: HOST
+              value: '0.0.0.0'
+            - name: PORT
+              value: '80'
+            - name: BASE_URL
+              value: 'https://{{ .Values.ingress.host }}/'
+            - name: BASE_DOCS_URL
+              value: '{{ .Values.comentario.baseDocsUrl }}'
+            - name: TOS_URL
+              value: '{{ .Values.comentario.tosUrl }}'
+            - name: PRIVACY_POLICY_URL
+              value: '{{ .Values.comentario.privacyPolicyUrl }}'
+            - name: HOME_CONTENT_URL
+              value: '{{ .Values.comentario.homeContentURL }}'
+            - name: SECRETS_FILE
+              value: /comentario-secrets/secrets.yaml
+            - name: EMAIL_FROM
+              value: '{{ .Values.comentario.emailFrom }}'
+            - name: SUPERUSER
+              value: '{{ .Values.comentario.superuser }}'
+            {{- if .Values.comentario.logFullIPs }}
+            - name: LOG_FULL_IPS
+              value: 'true'
+            {{- end }}
+            - name: GITLAB_URL
+              value: '{{ .Values.comentario.gitlabUrl }}'
+            {{- if .Values.comentario.liveUpdate.enabled }}
+            - name: WS_MAX_CLIENTS
+              value: '{{ .Values.comentario.liveUpdate.maxClients }}'
+            {{- else }}
+            - name: NO_LIVE_UPDATE
+              value: 'true'
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: secrets-volume
+          secret:
+            secretName: {{ .Values.comentario.secretName }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

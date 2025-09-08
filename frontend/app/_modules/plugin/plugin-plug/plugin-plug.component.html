@@ -1,0 +1,29 @@
+<!-- Custom element container -->
+<div #elementHost [appSpinner]="!pluginAvailable() && !pluginError()" spinnerSize="lg"></div>
+
+<!-- Load error, if any -->
+@if (pluginError(); as err) {
+    <div class="container p-4 alert alert-danger" role="alert">
+        <!-- Heading -->
+        <div class="alert-heading lead fw-bold" i18n>Plugin error</div>
+
+        <!-- Error details -->
+        <div i18n>Failed to load plugin <code>{{ pluginConfig()?.id }}</code>.</div>
+
+        <!-- Technical details -->
+        <div class="small">
+            <button [class.collapsed]="collapseErrorDetails"
+                    [attr.aria-expanded]="!collapseErrorDetails"
+                    (click)="errDetails.toggle()"
+                    type="button" class="btn btn-link btn-sm collapse-toggler" aria-controls="pluginErrorDetails">
+                <span class="me-2" i18n>Technical details</span>
+                <fa-icon [icon]="faAngleDown"/>
+            </button>
+            <div #errDetails="ngbCollapse" [(ngbCollapse)]="collapseErrorDetails" id="pluginErrorDetails">
+                <div @fadeInOut-fast>
+                    <code><pre>{{ err | json }}</pre></code>
+                </div>
+            </div>
+        </div>
+    </div>
+}

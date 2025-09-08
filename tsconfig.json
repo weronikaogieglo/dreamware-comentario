@@ -1,0 +1,27 @@
+{
+    "compileOnSave": false,
+    "compilerOptions": {
+        "baseUrl": "./",
+        "outDir": "./build/",
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "noImplicitOverride": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noPropertyAccessFromIndexSignature": false,
+        "sourceMap": true,
+        "declaration": false,
+        "downlevelIteration": true,
+        "useDefineForClassFields": false,
+        "moduleResolution": "node",
+        "importHelpers": true,
+        "target": "ES6",
+        "module": "ES2022",
+        "lib": [
+            "ES6",
+            "DOM",
+            "DOM.Iterable"
+        ]
+    }
+}

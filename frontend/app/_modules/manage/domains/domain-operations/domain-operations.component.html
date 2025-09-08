@@ -1,0 +1,167 @@
+<!-- Header with the badge -->
+<header class="d-flex flex-wrap align-items-center mb-3">
+    <h1 class="mb-0 me-2" i18n="heading">Operations</h1>
+    <app-domain-badge/>
+</header>
+
+<!-- Clone -->
+<div class="row border-bottom py-3 pb-sm-0">
+    <div class="col-sm-9">
+        <div class="fw-bold" i18n>Clone domain</div>
+        <p i18n>You can create a new domain based on the settings of this one. You will be able to change any setting before saving the new domain.</p>
+    </div>
+    <div class="col-sm-3 d-flex align-items-center">
+        <button [disabled]="!domain" [routerLink]="[Paths.manage.domains, domain?.id, 'clone']" class="btn btn-secondary w-100">
+            <fa-icon [icon]="faClone" class="me-1"/>
+            <ng-container i18n="action">Clone</ng-container>
+        </button>
+    </div>
+</div>
+
+<!-- Export data -->
+<div class="row border-bottom py-3 pb-sm-0">
+    <div class="col-sm-9">
+        <div class="fw-bold" i18n>Export</div>
+        <p i18n>Click this button to download a complete copy of the domain's comments and commenters. This data dump can be used later as a backup or for migration to another Comentario instance.</p>
+    </div>
+    <div class="col-sm-3 d-flex align-items-center">
+        <button [disable]="!domain" [appSpinner]="downloading.active" (click)="exportData()" class="btn btn-secondary w-100">
+            <fa-icon [icon]="faFileExport" class="me-1"/>
+            <ng-container i18n="action">Export data</ng-container>
+        </button>
+    </div>
+</div>
+
+<!-- Import data -->
+<div class="row border-bottom py-3 pb-sm-0">
+    <div class="col-sm-9">
+        <div class="fw-bold" i18n>Import</div>
+        <p i18n>Use this option to import comments and users previously exported from another service.</p>
+    </div>
+    <div class="col-sm-3 d-flex align-items-center">
+        <button [disabled]="!domain" [routerLink]="[Paths.manage.domains, domain?.id, 'import']" class="btn btn-secondary w-100">
+            <fa-icon [icon]="faFileImport" class="me-1"/>
+            <ng-container i18n="action">Import data</ng-container>
+        </button>
+    </div>
+</div>
+
+<!-- (Un)Freeze -->
+<div class="row border-bottom py-3 pb-sm-0">
+    <div class="col-sm-9">
+        <div class="fw-bold" i18n>Freeze domain</div>
+        <p i18n>Freezing your domain will disable new comments and voting temporarily. You may unfreeze the domain later.</p>
+    </div>
+    <div class="col-sm-3 d-flex align-items-center">
+        <button [disable]="!domain" [appSpinner]="freezing.active" [appConfirm]="freezeDlg"
+                [confirmAction]="freezeAction" confirmActionType="warning" [confirmIcon]="faCircleQuestion"
+                (confirmed)="toggleFrozen()" class="btn btn-secondary w-100">
+            <fa-icon [icon]="faSnowflake" class="me-1"/>
+            <ng-container>{{ freezeAction }}</ng-container>
+        </button>
+    </div>
+</div>
+
+<!-- Danger zone -->
+<section>
+    <!-- Collapse button -->
+    <div class="text-center">
+        <button [class.collapsed]="isDangerZoneCollapsed" [attr.aria-expanded]="!isDangerZoneCollapsed"
+                (click)="collapse.toggle()"
+                type="button" class="btn btn-outline-danger collapse-toggler px-5 mb-2" aria-controls="danger-zone-container">
+            <span class="me-2" i18n>Danger zone</span>
+            <fa-icon [icon]="faAngleDown"/>
+        </button>
+    </div>
+
+    <!-- Danger zone content -->
+    <div #collapse="ngbCollapse" [(ngbCollapse)]="isDangerZoneCollapsed" id="danger-zone-container">
+        <!-- Purge deleted comments -->
+        <div class="row border-bottom py-3 pb-sm-0">
+            <div class="col-sm-9">
+                <div class="fw-bold text-danger" i18n>Purge comments</div>
+                <p i18n>This will definitively delete all comments on the domain that are marked as deleted.</p>
+            </div>
+            <div class="col-sm-3 d-flex align-items-center">
+                <button [disable]="!domain" [appSpinner]="purging.active" [appConfirm]="purgeDomainDlg"
+                        [confirmActionEnabled]="purgeForm.controls.markedDeleted.value || purgeForm.controls.userCreatedDeleted.value"
+                        confirmAction="Purge comments" (confirmed)="purgeDomain()" class="btn btn-danger w-100"
+                        i18n-confirmAction>
+                    <fa-icon [icon]="faEraser" class="me-1"/>
+                    <ng-container i18n="action">Purge</ng-container>
+                </button>
+            </div>
+        </div>
+
+        <!-- Clear domain -->
+        <div class="row border-bottom py-3 pb-sm-0">
+            <div class="col-sm-9">
+                <div class="fw-bold text-danger" i18n>Clear domain</div>
+                <p i18n>This will permanently delete all comments, domain pages, votes, and view statistics, without affecting your settings. This may be useful if you want to clean up after testing Comentario.</p>
+            </div>
+            <div class="col-sm-3 d-flex align-items-center">
+                <button [disable]="!domain" [appSpinner]="clearing.active" [appConfirm]="clearDomainDlg"
+                        confirmAction="Clear domain" (confirmed)="clearDomain()" class="btn btn-danger w-100"
+                        i18n-confirmAction>
+                    <fa-icon [icon]="faCalendarXmark" class="me-1"/>
+                    <ng-container i18n="action">Clear</ng-container>
+                </button>
+            </div>
+        </div>
+
+        <!-- Delete -->
+        <div class="row border-bottom py-3 pb-sm-0">
+            <div class="col-sm-9">
+                <div class="fw-bold text-danger" i18n>Delete domain</div>
+                <p i18n>This will permanently delete all comments and other data associated with your domain.</p>
+            </div>
+            <div class="col-sm-3 d-flex align-items-center">
+                <button [disable]="!domain" [appSpinner]="deleting.active" [appConfirm]="deleteDlg"
+                        confirmAction="Delete domain" (confirmed)="delete()" class="btn btn-danger w-100" i18n-confirmAction>
+                    <fa-icon [icon]="faTrashAlt" class="me-1"/>
+                    <ng-container i18n="action">Delete</ng-container>
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Freeze domain confirmation dialog content template -->
+<ng-template #freezeDlg>
+    @if (domain?.isReadonly) {
+        <p i18n>Are you sure you want to unfreeze the domain? This will enable adding comments on it.</p>
+    } @else {
+        <p i18n>Are you sure you want to freeze the domain? This will make the domain read-only, disabling adding comments.</p>
+    }
+</ng-template>
+
+<!-- Clear domain confirmation dialog content template -->
+<ng-template #purgeDomainDlg>
+    <div i18n>Permanently remove from domain <code>{{ domain?.host }}</code>:</div>
+    <form [formGroup]="purgeForm" class="mb-3 ps-2">
+        <!-- Marked as deleted -->
+        <div class="form-check">
+            <input formControlName="markedDeleted" type="checkbox" class="form-check-input" id="purge-marked-deleted">
+            <label class="form-check-label" for="purge-marked-deleted" i18n>Comments marked as deleted</label>
+        </div>
+        <!-- By deleted users -->
+        <div class="form-check">
+            <input formControlName="userCreatedDeleted" type="checkbox" class="form-check-input" id="purge-user-created-deleted">
+            <label class="form-check-label" for="purge-user-created-deleted" i18n>Comments created by now deleted users</label>
+        </div>
+    </form>
+    <p i18n>This will also remove all child comments of the deleted comments.</p>
+    <p class="fw-bold" i18n>Please note: this action cannot be undone.</p>
+</ng-template>
+
+<!-- Clear domain confirmation dialog content template -->
+<ng-template #clearDomainDlg>
+    <p i18n>Are you absolutely sure you want to remove all comments and pages from the domain <code>{{ domain?.host }}</code>?</p>
+    <p class="fw-bold" i18n>Please note: this action cannot be undone.</p>
+</ng-template>
+
+<!-- Delete confirmation dialog content template -->
+<ng-template #deleteDlg>
+    <p i18n>Are you absolutely sure you want to delete the domain <code>{{ domain?.host }}</code>?</p>
+    <p class="fw-bold" i18n>Please note: this action cannot be undone.</p>
+</ng-template>

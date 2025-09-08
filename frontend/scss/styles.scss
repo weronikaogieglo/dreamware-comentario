@@ -1,0 +1,556 @@
+@use "sass:color";
+
+// Fonts
+@use "fonts";
+
+// Common vars
+@import "vars";
+
+// Import Bootstrap
+@import "bootstrap/scss/bootstrap";
+
+// highlight.js theme
+@import 'highlight.js/styles/stackoverflow-light';
+
+// Give all root elements full height so that we can position the footer at the bottom of the screen
+html, body, app-root {
+    height: 100%;
+}
+
+section {
+    padding-top: $spacer;
+    margin-bottom: 3rem;
+    transition: all 0.3s linear;
+
+    // Section title
+    &>h1, &>h2, &>h3 {
+        margin-bottom: $spacer;
+    }
+
+    &.danger {
+        border-top: #f67d8a 2px dashed;
+        background-color: color.adjust($danger-bg-subtle, $alpha: -0.5);
+        color: $danger-text-emphasis;
+    }
+}
+
+.desaturate {
+    filter: saturate(0%);
+}
+
+.smaller {
+    font-size: $small-font-size * 0.9;
+}
+
+// Additional colour classes
+
+.border-current-user {
+    border-color: 5fa665 !important;
+}
+
+.bg-current-user {
+    background-color: #5fa665 !important;
+    background-image: linear-gradient(180deg, #5fa665 0%, #c0ba32 100%);
+}
+
+.bg-superuser {
+    background-color: #7c82f7 !important;
+    background-image: linear-gradient(180deg, #7c82f7 0%, #b763fd 100%);
+}
+
+
+// Create "motley" text and background shadows
+$motley-colours: (
+    1: (#898eff -1px -2px 30px, #ffce84 -1px -2px 63px),
+    2: (#9e59ff  1px -2px 30px, #ffb9f8  1px -2px 63px),
+    3: (#ffc04b  1px -2px 30px, #ffb9f8  1px -2px 63px),
+    4: (#8dff02  1px -2px 30px, #fff14d  1px -2px 63px),
+    5: (#16d9d9  1px -2px 30px, #f8ff85  1px -2px 63px),
+);
+
+@each $idx, $shadow in $motley-colours {
+    .bg-motley-#{$idx}   { box-shadow:  $shadow; }
+    .text-motley-#{$idx} { text-shadow: $shadow; }
+}
+
+// "Motley" heading styles
+@mixin heading-motley {
+    text-shadow:
+        #ffb300 0 -10px 20px,
+        #6068ff 0 2px 15px;
+}
+
+.heading-motley {
+    @include heading-motley;
+}
+
+.heading-separator {
+    padding-top: calc(26.656px + 12rem);
+    padding-bottom: 2rem;
+    background:
+        50% 6rem
+        no-repeat
+        url("data:image/svg+xml,%3Csvg width='200' height='26.656' viewBox='0 0 52.917 7.053' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath style='fill:%234950d8;stroke-width:.430275' d='M2.58 6.53c-.59-.23-1.118-.64-1.535-1.117C.576 4.875.157 4.23.035 3.525c-.113-.64-.051-2.83 1.59-3.39-.178.292-.4.928-.447 1.423a5.184 5.184 0 0 0 .24 2.096c.144.439.363.876.692 1.199.407.399.938.709 1.496.827.617.131 1.41.08 2.085-.257.675-.336 4.422-2.284 5.593-2.83.292-.135.575-.257.882-.392a11.372 11.372 0 0 1 .959-.373c1.007-.343 1.806-.513 2.734-.516.717-.002 1.458.104 2.117.387.582.249 1.177.595 1.536 1.116.412.6.746 1.497.563 2.111-.236.797-.804 1.053-1.369.91 1.53-.698.269-2.268-.148-2.634-.34-.297-.77-.49-1.202-.624a3.185 3.185 0 0 0-1.04-.129c-.361.012-.715.11-1.063.2a1.63 1.63 0 0 0-.187.065c-.068.026-.133.059-.2.09-1.883.906-4.422 2.285-5.593 2.83-.292.137-.575.258-.882.394a11.49 11.49 0 0 1-.959.373c-1.007.343-1.918.515-2.734.515-.598.008-1.226-.04-2.118-.386zm47.756 0c.59-.23 1.12-.64 1.535-1.117.47-.538.889-1.184 1.011-1.888.112-.64.05-2.83-1.59-3.39.177.292.399.928.446 1.423a5.184 5.184 0 0 1-.239 2.096c-.145.439-.363.876-.693 1.199-.406.399-.938.709-1.495.827-.617.131-1.41.08-2.085-.257-.676-.336-4.422-2.284-5.594-2.83-.292-.135-.574-.257-.882-.392a11.372 11.372 0 0 0-.958-.373c-1.007-.343-1.807-.513-2.734-.516-.718-.002-1.458.104-2.118.387-.581.249-1.177.595-1.535 1.116-.412.6-.746 1.497-.564 2.111.237.797.805 1.053 1.37.91-1.531-.698-.27-2.268.148-2.634.34-.297.77-.49 1.2-.624.335-.104.692-.14 1.042-.129.36.012.714.11 1.063.2.064.018.125.04.186.065.068.026.134.059.2.09 1.883.906 4.423 2.285 5.594 2.83.292.137.574.258.882.394.294.13.614.255.959.373 1.006.343 1.918.515 2.733.515.598.008 1.226-.04 2.118-.386z'/%3E%3Cpath d='M25.943.148q0 .775.148 1.495.13.702.277 1.46-.665-.37-1.31-.72-.647-.352-1.404-.61l-.11-.038-.518 1.552.148.055q.739.277 1.477.37.738.073 1.514.128-.61.518-1.144 1.016-.536.48-.998 1.126l-.092.13 1.348.941.074-.11q.443-.665.775-1.311l.647-1.367q.332.702.664 1.367.314.646.757 1.31l.073.111 1.348-.941-.092-.13q-.462-.646-.997-1.126-.535-.498-1.145-1.016.776-.055 1.514-.128.74-.093 1.477-.37l.148-.055-.517-1.55-.11.036q-.758.258-1.404.61-.646.35-1.31.72.147-.758.295-1.46.13-.72.13-1.495V0h-1.663z' style='fill:%23ec8100;stroke-width:.116073'/%3E%3C/svg%3E");
+    @include heading-motley;
+}
+
+.heading-parens {
+    &::before {
+        display: inline-block;
+        content: '(';
+        padding-right: 1rem;
+        color: $primary;
+        opacity: 0.75;
+    }
+    &::after {
+        display: inline-block;
+        content: ')';
+        padding-left: 1rem;
+        color: $primary;
+        opacity: 0.75;
+    }
+    margin-top: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+// A "motley" ordered list (one with large numbers against a round backdrop)
+ol.list-motley {
+    list-style-type: none;
+
+    li {
+        display: flex;
+        align-items: center;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+
+        @include media-breakpoint-down(md) {
+            &:not(:last-child) {
+                border-bottom: 1px solid $secondary;
+            }
+        }
+
+        .marker {
+            display: inline-flex;
+            flex: 0 0 1.67em;
+            width: 1.67em;
+            height: 1.67em;
+            justify-content: center;
+            align-items: center;
+            background-color: $primary;
+            color: $white;
+            font-size: 150%;
+            font-weight: bold;
+            border-radius: 50%;
+            margin-right: 0.25rem;
+        }
+    }
+}
+
+// Collapse toggler
+.collapse-toggler {
+
+    svg {
+        transform: rotate(180deg);
+        transition: all ease 0.333s;
+    }
+
+    &.collapsed {
+        svg {
+            transform: rotate(0deg);
+        }
+    }
+}
+
+.floating-badge {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    transform: translate(-50%, -50%);
+    animation: fade-in-linear-animation .25s ease forwards 1;
+}
+
+// Detail table
+dl.detail-table, dl.detail-table > div {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    margin: 0; // Override the standard 1rem bottom margin
+
+    dt {
+        flex: 0 0 33%;
+        margin-bottom: 0.5rem;
+        margin-right: 15px;
+        &:after {
+            content: ':';
+        }
+    }
+    dd {
+        flex: 1;
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    // Display both dt and dd at full-width on sm and down
+    @include media-breakpoint-down(md) {
+        & {
+            display: block;
+            dt {
+                margin-bottom: 0;
+            }
+            dd {
+                margin-bottom: 1rem;
+                // Allow value text wrapping
+                white-space: normal;
+            }
+        }
+    }
+}
+// Detail table with the first column width at 30%
+dl.detail-table.dt-50 {
+    dt {
+        flex: 0 0 50%;
+    }
+}
+
+// Separate block from the previous one: XS by a top margin, from SM up by a left border
+.separate-sm-left {
+    margin-top: 1.5rem;
+
+    @include media-breakpoint-up(sm) {
+        border-left: 1px solid #dee2e6;
+        margin-top: 0;
+    }
+}
+
+.toolbar {
+    > * {
+        margin: .25rem;
+    }
+}
+
+.form-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: .5rem;
+    padding: .75rem;
+    border-top: 1px solid $border-color;
+
+    > * {
+        margin: .25rem;
+    }
+}
+
+.text-dimmed {
+    opacity: 0.667;
+}
+
+.text-copyable {
+    cursor: pointer;
+    padding: 2px;
+
+    &::after {
+        content: '';
+        display: inline-block;
+        margin-left: .25em;
+        width: 1em;
+        height: 1em;
+        opacity: 0.5;
+        background:
+            no-repeat
+            bottom/80%
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%234950d8' d='M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z'/%3E%3C/svg%3E");
+    }
+    &:hover, &:focus {
+        background-color: color.adjust($secondary, $alpha: -0.75);
+    }
+}
+
+.colon::after {
+    content: ':';
+}
+
+.internal-link {
+    border-bottom: 1px dashed $primary;
+}
+
+.external-link::after {
+    content: '';
+    display: inline-block;
+    margin-left: .25rem;
+    width: 1em;
+    height: 1em;
+    opacity: 0.5;
+    background:
+        no-repeat
+        bottom/80%
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%234950d8' d='M352 0c-12.9 0-24.6 7.8-29.6 19.8s-2.2 25.7 6.9 34.9L370.7 96 201.4 265.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L416 141.3l41.4 41.4c9.2 9.2 22.9 11.9 34.9 6.9s19.8-16.6 19.8-29.6V32c0-17.7-14.3-32-32-32H352zM80 32C35.8 32 0 67.8 0 112V432c0 44.2 35.8 80 80 80H400c44.2 0 80-35.8 80-80V320c0-17.7-14.3-32-32-32s-32 14.3-32 32V432c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16V112c0-8.8 7.2-16 16-16H192c17.7 0 32-14.3 32-32s-14.3-32-32-32H80z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.w-max-500 {
+    max-width: 500px !important;
+}
+
+// When in flex mode, scale to half the available space
+.flex-50 {
+    flex: 1 1 50%;
+}
+
+.comment-text {
+    // Let's try to match the "native" comment card
+    font-family: 'Source Sans Pro', sans-serif;
+    font-size: 15px;
+
+    // Remove the default margin from the bottom after the comment text
+    p:last-child {
+        margin-bottom: 0 !important;
+    }
+
+    // Do not allow Markdown-inserted images to be wider than the card
+    img {
+        max-width: 100%;
+    }
+
+    // Properly style inserted tables
+    table {
+        margin-bottom: 1rem;
+        vertical-align: top;
+        border-color: #{$table-border-color};
+        caption-side: bottom;
+        border-collapse: collapse;
+
+        tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba($black, .05);
+        }
+
+        td, th {
+            padding: 0.35rem 0.5rem;
+            border: 1px solid #{$table-border-color};
+        }
+    }
+}
+
+// Social buttons
+@each $color, $value in $social-colors {
+    .btn-#{$color} {
+        @include button-variant($value, $value, #ffffff);
+    }
+    .btn-outline-#{$color} {
+        @include button-outline-variant($value);
+    }
+}
+
+.nav-item {
+    .nav-link {
+        &.is-invalid {
+            color: $danger;
+
+            &::before {
+                content: '!';
+                color: $white;
+                background-color: $danger;
+                text-align: center;
+                padding: 0 0.5em;
+                display: inline-block;
+                margin-right: .25rem;
+                font-size: 85%;
+            }
+        }
+    }
+}
+
+// Home
+#front-page {
+    &.authenticated .hide-authenticated {
+        display: none !important;
+    }
+
+    &.unauthenticated .hide-unauthenticated {
+        display: none !important;
+    }
+
+    font-size: 115%;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// Animations
+//----------------------------------------------------------------------------------------------------------------------
+
+.fade-in {
+    animation: fade-in-animation 0.5s ease forwards 1;
+}
+
+// Generate a fade-in animation classes for various delays
+@for $i from 1 through 5 {
+    .fade-in-#{$i}s {
+        animation: fade-in-animation #{$i}s ease forwards 1;
+    }
+}
+@keyframes fade-in-animation {
+    0%   { opacity: 0; }
+    75%  { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes fade-in-linear-animation {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes fade-blink-30 {
+    0%  { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// Spinners
+//----------------------------------------------------------------------------------------------------------------------
+
+.is-spinning-sm::before, .is-spinning-lg::before {
+    display: inline-block;
+    content: '';
+    background:
+        url("data:image/svg+xml,%3Csvg width='135' height='135' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M80.651 14.018q0 12.273-2.337 23.672-2.047 11.105-4.384 23.088 10.52-5.846 20.75-11.399 10.227-5.552 22.21-9.644l1.753-.584 8.183 24.548-2.339.876q-11.689 4.384-23.38 5.846-11.689 1.169-23.964 2.045 9.646 8.184 18.12 16.073 8.476 7.6 15.783 17.828l1.461 2.045-21.335 14.906-1.168-1.754q-7.013-10.52-12.273-20.75-4.97-10.52-10.23-21.624-5.26 11.105-10.52 21.625Q52.013 111.043 45 121.564l-1.17 1.754-21.334-14.906 1.46-2.045Q31.265 96.14 39.74 88.54q8.474-7.89 18.118-16.073-12.273-.876-23.964-2.045-11.69-1.462-23.378-5.846l-2.339-.876 8.183-24.547 1.753.582q11.983 4.092 22.211 9.646 10.228 5.55 20.75 11.397-2.338-11.983-4.677-23.088-2.045-11.397-2.045-23.672V11.68h26.3z' fill='%23ec8100'/%3E%3C/svg%3E")
+        center/100%
+        no-repeat;
+}
+
+.is-spinning-sm {
+    pointer-events: none;
+
+    &::before {
+        width: 1rem;
+        height: 1rem;
+        margin-left: 0.25rem;
+        margin-right: 0.25rem;
+        vertical-align: -0.125em;
+        animation: 1s linear infinite spinner-border; // Defined by Bootstrap
+    }
+}
+.is-spinning-lg {
+    position: relative;
+    min-height: 100px;
+    pointer-events: none;
+
+    // Animated border
+    &::before {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 3rem;
+        height: 3rem;
+        margin-left: -1.5rem;
+        margin-top: -1.5rem;
+        box-sizing: border-box;
+        z-index: 1000;
+        animation: 1s linear infinite spinner-border; // Defined by Bootstrap
+    }
+
+    // Translucent backdrop
+    &::after {
+        // Position the backdrop above the entire element
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        z-index: 999;
+
+        // Spinner text properties: center the text inside the element across both axes, adding vertical padding to push
+        // the text under the spinner animation
+        content: attr(data-spinner-text);
+        text-transform: uppercase;
+        display: flex;
+        padding-top: 5rem;
+        align-items: center;
+        justify-content: center;
+        font-size: smaller;
+
+        // Blink animation
+        animation: 3s linear infinite fade-blink-30;
+    }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// Bootstrap fixes
+//----------------------------------------------------------------------------------------------------------------------
+
+// Make text white on buttons (it's dark by default and that looks ugly)
+.btn-primary, .btn-secondary, .btn-cta {
+    --bs-btn-color:        #fff;
+    --bs-btn-hover-color:  #fff;
+    --bs-btn-active-color: #fff;
+}
+.btn-outline-primary, .btn-outline-secondary, .btn-outline-cta {
+    --bs-btn-hover-color:  #fff;
+    --bs-btn-active-color: #fff;
+}
+
+// Toast
+.toast {
+    // Fix the lower corners of the body sticking over the rounded corners of the toast
+    overflow: hidden;
+}
+.toast-body {
+    background-color: rgba($white, .8);
+}
+
+// nav-pill with .text-danger becomes white-on-red when .active
+.nav-pills .nav-link.active.text-danger {
+    color: $light !important;
+    --bs-nav-pills-link-active-bg: #{$danger};
+}
+
+.card {
+    // Add a drop-shadow to cards
+    box-shadow: $btn-box-shadow;
+    // Colourise card title
+    --bs-card-title-color: #{$info};
+}
+
+// New styles for list group
+.list-group-item-header {
+    // Offset the group item padding to let the background flush up to the border
+    margin-top: calc(-1 * var(--bs-list-group-item-padding-y));
+    margin-left: calc(-1 * var(--bs-list-group-item-padding-x));
+    margin-right: calc(-1 * var(--bs-list-group-item-padding-x));
+    padding: var(--bs-list-group-item-padding-y) var(--bs-list-group-item-padding-x);
+    background-color: $gray-100;
+}
+
+.list-group-item-pending {
+    border-left: 4px solid $secondary;
+}
+
+.list-group-item-rejected {
+    border-left: 4px solid $warning;
+}
+
+.list-group-item-deleted {
+    border-left: 4px solid $danger;
+    color: $gray-400;
+}
+
+// Table
+.table-narrow {
+    width: auto;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// ng-bootstrap fixes
+//----------------------------------------------------------------------------------------------------------------------
+
+// Extra style to remove the standard arrow from the dropdown
+.dropdown-toggle.no-arrow::after {
+    content: initial;
+}
+
+// Make the typeahead's popup scrollable
+ngb-typeahead-window.dropdown-menu {
+    max-height: 350px !important;
+    overflow-y: auto;
+}

@@ -1,0 +1,30 @@
+<div [class.h-100]="fullHeight()" class="col">
+    <div [class.h-100]="fullHeight()" class="card shadow-none border-0 position-relative">
+        <!-- Chart -->
+        @if (chartData(); as data) {
+            <div class="metric-chart">
+                <canvas baseChart type="bar" [options]="chartOptions" [data]="data"></canvas>
+            </div>
+        }
+
+        <!-- Card body -->
+        <div class="card-body text-nowrap metric-card-body">
+            <div class="card-title">
+                <div class="metric-label">{{ label() }}</div>
+                @if (sublabel(); as l) {
+                    <div class="metric-sublabel">{{ l }}</div>
+                }
+            </div>
+            <div class="card-text">
+                <!-- Metric value -->
+                @let v = value();
+                @if (v !== undefined) {
+                    <div [class.metric-value-1m]="v >= 1e6" class="metric-value">{{ v | number }}</div>
+                } @else {
+                    <!-- Spinner in case the value is not yet known -->
+                    <div class="spinner-grow spinner-grow-sm" role="status"></div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

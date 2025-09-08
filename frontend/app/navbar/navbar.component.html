@@ -1,0 +1,43 @@
+<nav id="app-navbar" class="navbar navbar-expand navbar-light flex-wrap flex-md-nowrap" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+    <!-- Logo -->
+    <div class="nav-row">
+        <a [routerLink]="Paths.home" id="navbar-logo"><img ngSrc="images/logo.svg" priority width="192" height="48" alt="Logo"></a>
+    </div>
+
+    <!-- Navbar content -->
+    <div class="nav-row flex-md-grow-1 flex-wrap flex-md-nowrap" id="navbar-content">
+        <ul class="navbar-nav ms-md-auto">
+            <!-- Plugin items -->
+            @for (plug of plugs; track plug) {
+                <li class="nav-item">
+                    <a class="nav-link" [routerLink]="[Paths.plugin, plug.pluginPath, plug.path]">{{ plug.label }}</a>
+                </li>
+            }
+            <!-- Docs -->
+            <li class="nav-item"><a class="nav-link" [href]="docsSvc.urlHome" target="_blank" rel="noopener" i18n="menu item">Docs</a></li>
+            <!-- About -->
+            <li class="nav-item"><a class="nav-link" [href]="docsSvc.urlAbout" target="_blank" rel="noopener" i18n="menu item">About</a></li>
+        </ul>
+
+        <ul class="navbar-nav">
+            <!-- User button -->
+            @if (principalSvc.principal(); as p) {
+                <li class="nav-item">
+                    <a [routerLink]="Paths.manage.dashboard" class="btn btn-outline-info d-flex align-items-center" id="user-nav-button">
+                        <!-- User icon -->
+                        <app-user-avatar [user]="p" [updated]="principalSvc.updatedTime()" class="me-1"/>
+                        <!-- User's name -->
+                        <div class="text-truncate position-relative ms-1" style="max-width: 100px">
+                            <ng-container>{{ p.name }}</ng-container>
+                        </div>
+                    </a>
+                </li>
+            } @else {
+                <!-- Sign in -->
+                <li class="nav-item">
+                    <a [routerLink]="Paths.auth.login" class="btn btn-primary" id="login-nav-button" i18n>Sign in</a>
+                </li>
+            }
+        </ul>
+    </div>
+</nav>

@@ -1,0 +1,45 @@
+{{ define "content" }}
+<div style="margin: 12px 0;">
+    <div style="margin: 0; font-size: 20px; font-weight: bold;">
+        {{- if eq .Kind "reply" }}
+            {{- T "unreadReply" -}}
+        {{- else if .IsPending -}}
+            {{- T "commentIsPending" -}}
+        {{- else if eq .Kind "commentStatus" -}}
+            {{- if .IsApproved }}{{ T "commentIsApproved" }}{{ else }}{{ T "commentIsRejected" }}{{ end -}}
+        {{- else -}}
+            {{- T "newComment" -}}
+        {{- end -}}
+    </div>
+
+    <!-- Reason for the pending status -->
+    {{- if and .IsPending .PendingReason }}
+        <div style="font-size: 14px; color: #868e96">{{ .PendingReason }}</div>
+    {{- end }}
+</div>
+
+<!-- Comment -->
+<div style="margin-bottom: 12px; padding: 10px; border: 1px solid #eeeeee; border-radius: 2px;">
+    <!-- Header -->
+    <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; margin-bottom: 12px;">
+        <span style="font-size: 14px; font-weight: bold; color: #1e2127;">{{ .CommenterName }}</span>
+        —
+        <a href="{{ .PageURL }}" class="page" style="margin-bottom: 10px; text-decoration: none; color: #4950d8;">"{{ .PageTitle }}"</a>
+    </div>
+
+    <!-- Comment text -->
+    <div style="line-height: 20px; margin-bottom: 12px">{{ .HTML }}</div>
+
+    <!-- Moderation actions bar -->
+    <div style="text-align: right; font-size:12px; font-weight: bold;">
+        {{ if .CanModerate }}
+            {{ if .IsPending }}
+                <a href="{{ .ApproveURL }}" style="padding: 5px; text-decoration: none; text-transform: uppercase; color: #198754; border: 1px solid #198754; border-radius: 2px;">{{ T "actionApprove" }}</a>
+                <a href="{{ .RejectURL  }}" style="padding: 5px; text-decoration: none; text-transform: uppercase; color: #ffc107; border: 1px solid #ffc107; border-radius: 2px;">{{ T "actionReject" }}</a>
+            {{ end }}
+            <a href="{{ .DeleteURL      }}" style="padding: 5px; text-decoration: none; text-transform: uppercase; color: #dc3545; border: 1px solid #dc3545; border-radius: 2px;">{{ T "actionDelete" }}</a>
+        {{ end }}
+        <a href="{{ .CommentURL         }}" style="padding: 5px; text-decoration: none; text-transform: uppercase; color: #495057; border: 1px solid #495057; border-radius: 2px;">{{ T "actionContext" }}</a>
+    </div>
+</div>
+{{ end }}

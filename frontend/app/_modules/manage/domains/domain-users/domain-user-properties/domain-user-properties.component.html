@@ -1,0 +1,71 @@
+<!-- Heading -->
+<h1 i18n="heading">Domain user properties</h1>
+
+<div [appSpinner]="loading.active" spinnerSize="lg">
+    @let user = userDomainUser()?.user;
+    @let domainUser = userDomainUser()?.domainUser;
+    @if (domainUser && user) {
+        <div class="row">
+            <!-- Buttons -->
+            <div class="col-md-4 order-md-last pb-3">
+                <!-- Edit -->
+                <a routerLink="edit" class="btn btn-secondary w-100 mb-2">
+                    <fa-icon [icon]="faEdit" class="me-1"/>
+                    <ng-container i18n>Edit</ng-container>
+                </a>
+            </div>
+
+            <!-- Detail table -->
+            <div class="col col-md-8">
+                <dl class="detail-table" id="domainUserDetailTable">
+                    <!-- Role -->
+                    <div>
+                        <dt i18n>Role</dt>
+                        <dd><app-domain-user-role-badge [role]="domainUser.role"/></dd>
+                    </div>
+                    <!-- Reply notifications -->
+                    <div>
+                        <dt i18n>Reply notifications</dt>
+                        <dd><app-checkmark [value]="domainUser.notifyReplies"/></dd>
+                    </div>
+                    <!-- Moderator notifications -->
+                    <div>
+                        <dt i18n>Moderator notifications</dt>
+                        <dd><app-checkmark [value]="domainUser.notifyModerator"/></dd>
+                    </div>
+                    <!-- Comment status notifications -->
+                    <div>
+                        <dt i18n>Comment status notifications</dt>
+                        <dd><app-checkmark [value]="domainUser.notifyCommentStatus"/></dd>
+                    </div>
+                    <!-- Created -->
+                    @if (domainUser.createdTime | datetime; as v) {
+                        <div>
+                            <dt i18n>Created</dt>
+                            <dd>{{ v }}</dd>
+                        </div>
+                    }
+                </dl>
+
+                <!-- Related user properties -->
+                <section>
+                    <h2 i18n>Related user properties</h2>
+                    <app-user-details [user]="user" [userLink]="isSuperuser()" id="user-details"/>
+                </section>
+            </div>
+        </div>
+
+        <!-- Comments -->
+        <section>
+            <!-- Heading -->
+            <h2 i18n>Comments</h2>
+
+            <!-- Comment list -->
+            <app-comment-list [userId]="user.id"/>
+        </section>
+
+    <!-- Placeholder when no data -->
+    } @else {
+        <app-no-data/>
+    }
+</div>
