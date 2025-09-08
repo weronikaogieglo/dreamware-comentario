@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: 'Das Konto wurde erfolgreich erstellt. Bitte prüfe deine E-Mail und klicke auf den darin enthaltenen Bestätigungslink.'}
-- {id: actionAddComment,            translation: 'Kommentar hinzufügen'}
+- {id: actionAddComment,            translation: 'Veröffentlichen'}
 - {id: actionApprove,               translation: 'Genehmigen'}
 - {id: actionCancel,                translation: 'Abbrechen'}
 - {id: actionClose,                 translation: 'Schließen'}
@@ -33,6 +33,8 @@
 - {id: btnBold,                     translation: 'Fett'}
 - {id: btnBulletList,               translation: 'Aufzählungsliste'}
 - {id: btnCode,                     translation: 'Code'}
+- {id: btnEmoji,                    translation: 'Emoji'}
+- {id: btnGiphy,                    translation: 'GIPHY GIFs'}
 - {id: btnEditorHelp,               translation: 'Editor-Hilfe'}
 - {id: btnImage,                    translation: 'Bild'}
 - {id: btnItalic,                   translation: 'Kursiv'}
@@ -72,6 +74,8 @@
 - {id: error,                       translation: 'Fehler'}
 - {id: errorUnknown,                translation: 'Unbekannter Fehler'}
 - {id: errorUnknownHost,            translation: 'Diese Domain ist nicht in Comentario registriert'}
+- {id: giphyNoResults,              translation: 'Keine GIFs gefunden'}
+- {id: giphySearchPlaceholder,      translation: 'GIFs suchen...'}
 - {id: fieldComStatusNotifications, translation: 'Benachrichtigungen über den Kommentarstatus'}
 - {id: fieldModNotifications,       translation: 'Moderator-Benachrichtigungen'}
 - {id: fieldOnlyThisPage,           translation: 'Nur diese Seite'}
@@ -120,6 +124,7 @@
 - {id: statusEditedByModerator,     translation: 'bearbeitet von Moderator'}
 - {id: statusModerator,             translation: 'Moderator'}
 - {id: statusPending,               translation: 'Ausstehend'}
+- {id: statusUnknownUser,           translation: 'Unbekannter Benutzer'}
 - {id: stickyComment,               translation: 'Angehefteter Kommentar'}
 - {id: technicalDetails,            translation: 'Technische Details'}
 - {id: timeJustNow,                 translation: 'soeben'}

@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: '帳戶創建成功。請檢查您的電子信箱並點擊確認連結。'}
-- {id: actionAddComment,            translation: '添加評論'}
+- {id: actionAddComment,            translation: '發布'}
 - {id: actionApprove,               translation: '批准'}
 - {id: actionCancel,                translation: '取消'}
 - {id: actionClose,                 translation: '關閉'}
@@ -115,6 +115,7 @@
 - {id: statusEditedByModerator,     translation: '由審核員編輯'}
 - {id: statusModerator,             translation: '審核員'}
 - {id: statusPending,               translation: '待審核'}
+- {id: statusUnknownUser,           translation: '未知使用者'}
 - {id: stickyComment,               translation: '置頂評論'}
 - {id: technicalDetails,            translation: '技術細節'}
 - {id: timeJustNow,                 translation: '剛剛'}

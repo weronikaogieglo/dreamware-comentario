@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: 'Tài khoản của bạn đã được tạo thành công. Vui lòng kiểm tra email và nhấp vào liên kết xác nhận.'}
-- {id: actionAddComment,            translation: 'Thêm bình luận'}
+- {id: actionAddComment,            translation: 'Đăng'}
 - {id: actionApprove,               translation: 'Phê duyệt'}
 - {id: actionCancel,                translation: 'Hủy'}
 - {id: actionClose,                 translation: 'Đóng'}
@@ -115,6 +115,7 @@
 - {id: statusEditedByModerator,     translation: 'được chỉnh sửa bởi người kiểm duyệt'}
 - {id: statusModerator,             translation: 'Người kiểm duyệt'}
 - {id: statusPending,               translation: 'Đang chờ'}
+- {id: statusUnknownUser,           translation: 'Người dùng không xác định'}
 - {id: stickyComment,               translation: 'Bình luận được ghim'}
 - {id: technicalDetails,            translation: 'Chi tiết kỹ thuật'}
 - {id: timeJustNow,                 translation: 'vừa mới'}

@@ -5,6 +5,68 @@
     width: 100%;
     display: flex;
     flex-direction: column;
+    background: var(--cmntr-bg); 
+    border-radius: 8px; 
+    border: 1px solid var(--cmntr-card-border, #e5e7eb); 
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden; 
+    margin: 16px 0; 
+
+
+    .comentario-toolbar {
+        margin-bottom: 12px; 
+        padding: 8px 0; 
+        border-bottom: 1px solid var(--cmntr-card-border, #e5e7eb); 
+        margin: 0; 
+        border-radius: 0; 
+        box-shadow: none;
+        background: transparent; 
+        border: none; 
+        
+     
+        .comentario-toolbar-section:last-child {
+            .comentario-btn {
+                margin-left: 8px; 
+                transition: all 0.2s ease; 
+                border-radius: 4px; 
+                padding: 8px 16px; 
+                
+                &:hover {
+                    transform: translateY(-1px); 
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+                }
+                
+                &:active {
+                    transform: translateY(0); 
+                }
+                
+                &:focus {
+                    outline: 2px solid var(--cmntr-link-color, #007bff); 
+                    outline-offset: 2px;
+                }
+            }
+        }
+    }
+
+    textarea {
+        border: none; 
+        border-radius: 0; 
+        padding: 16px; 
+        font-family: inherit; 
+        font-size: 14px;
+        line-height: 1.5; 
+        resize: vertical;
+        min-height: 120px;
+        
+        &:focus {
+            outline: none; 
+            box-shadow: inset 0 0 0 2px var(--cmntr-link-color, #007bff); 
+        }
+        
+        &::placeholder {
+            color: var(--cmntr-muted-color, #6b7280); 
+        }
+    }
 
     .comentario-comment-editor-footer {
         display: flex;
@@ -12,14 +74,126 @@
         justify-content: end;
         align-items: center;
         margin-top: 12px;
+        padding: 16px;
+        border-top: 1px solid var(--cmntr-card-border, #e5e7eb); 
+        background: var(--cmntr-bg-shade, #f9fafb); 
+        border-radius: 0 0 8px 8px; 
+        
+        
+        .comentario-btn {
+            margin-left: 8px; 
+            transition: all 0.2s ease; 
+            border-radius: 4px; 
+            padding: 8px 16px; 
+            
+            &:hover {
+                transform: translateY(-1px); 
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+            }
+            
+            &:active {
+                transform: translateY(0); 
+            }
+            
+            &:focus {
+                outline: 2px solid var(--cmntr-link-color, #007bff);
+                outline-offset: 2px;
+            }
+        }
     }
 
     .comentario-comment-editor-preview {
-        min-height: 130px; // Consistent with the min-height of a textarea
-        padding: 8px;
-        border: 1px solid colours.$violet-2;
-        border-radius: 3px;
+        min-height: 130px; 
+        padding: 16px; 
+        border: none;
+        border-radius: 0; 
+        background: var(--cmntr-bg-shade, #f9fafb); 
+        margin: 0; 
 
         @include mixins.comment-text();
+    }
+}
+
+
+@media (max-width: 768px) {
+    .comentario-comment-editor {
+        margin: 12px 0; 
+        border-radius: 6px;
+        
+        .comentario-toolbar {
+            padding: 12px 0;
+            
+            .comentario-toolbar-section:last-child {
+                .comentario-btn {
+                    margin-left: 4px;
+                    padding: 6px 12px;
+                    font-size: 12px; 
+                    
+                    &.comentario-btn-sm {
+                        padding: 4px 8px;
+                        font-size: 11px;
+                    }
+                }
+            }
+        }
+        
+        textarea {
+            padding: 12px; 
+            font-size: 13px; 
+        }
+        
+        .comentario-comment-editor-footer {
+            padding: 12px; 
+            justify-content: center; 
+            
+            .comentario-btn {
+                margin: 4px; 
+                padding: 6px 12px;
+                font-size: 12px; 
+                
+              
+                &.comentario-btn-sm {
+                    padding: 4px 8px;
+                    font-size: 11px;
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    .comentario-comment-editor {
+        border-radius: 6px; 
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        margin: 8px 0; 
+        
+        .comentario-toolbar {
+            padding: 8px 0; 
+            
+            .comentario-toolbar-section:last-child {
+                .comentario-btn {
+                    margin-left: 2px; 
+                    padding: 4px 8px;
+                    font-size: 11px; 
+                }
+            }
+        }
+        
+        textarea {
+            padding: 8px; 
+            font-size: 12px; 
+            min-height: 100px;
+        }
+        
+        .comentario-comment-editor-footer {
+            padding: 8px; 
+            border-radius: 0 0 6px 6px; 
+            
+            .comentario-btn {
+                margin: 2px;
+                padding: 4px 8px; 
+                font-size: 11px;
+            }
+        }
     }
 }

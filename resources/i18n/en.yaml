@@ -2,7 +2,7 @@
 # serves as fallback for every other language if a certain message isn't found there.
 
 - {id: accountCreatedConfirmEmail,  translation: 'Account is successfully created. Please check your email and click the confirmation link it contains.'}
-- {id: actionAddComment,            translation: 'Add Comment'}
+- {id: actionAddComment,            translation: 'Publish'}
 - {id: actionApprove,               translation: 'Approve'}
 - {id: actionCancel,                translation: 'Cancel'}
 - {id: actionClose,                 translation: 'Close'}
@@ -32,10 +32,12 @@
 - {id: actionUnsticky,              translation: 'Unsticky'}
 - {id: actionUnsubscribe,           translation: 'Unsubscribe'}
 - {id: actionUpvote,                translation: 'Upvote'}
-- {id: addCommentPlaceholder,       translation: 'Add a comment'}
+- {id: addCommentPlaceholder,       translation: 'Add a comment...'}
 - {id: btnBold,                     translation: 'Bold'}
 - {id: btnBulletList,               translation: 'Bullet list'}
 - {id: btnCode,                     translation: 'Code'}
+- {id: btnEmoji,                    translation: 'Emoji'}
+- {id: btnGiphy,                    translation: 'GIPHY GIFs'}
 - {id: btnEditorHelp,               translation: 'Editor help'}
 - {id: btnImage,                    translation: 'Image'}
 - {id: btnItalic,                   translation: 'Italic'}
@@ -75,6 +77,8 @@
 - {id: error,                       translation: 'Error'}
 - {id: errorUnknown,                translation: 'Unknown error'}
 - {id: errorUnknownHost,            translation: 'This domain is not registered in Comentario'}
+- {id: giphyNoResults,              translation: 'No GIFs found'}
+- {id: giphySearchPlaceholder,      translation: 'Search GIFs...'}
 - {id: fieldComStatusNotifications, translation: 'Comment status notifications'}
 - {id: fieldModNotifications,       translation: 'Moderator notifications'}
 - {id: fieldOnlyThisPage,           translation: 'Only this page'}
@@ -123,6 +127,7 @@
 - {id: statusEditedByModerator,     translation: 'edited by moderator'}
 - {id: statusModerator,             translation: 'Moderator'}
 - {id: statusPending,               translation: 'Pending'}
+- {id: statusUnknownUser,           translation: 'Unknown User'}
 - {id: stickyComment,               translation: 'Sticky comment'}
 - {id: technicalDetails,            translation: 'Technical details'}
 - {id: timeJustNow,                 translation: 'just now'}

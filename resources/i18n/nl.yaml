@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: 'Account is succesvol aangemaakt. Controleer je e-mail en klik op de bevestigingslink die erin staat.'}
-- {id: actionAddComment,            translation: 'Comment toevoegen'}
+- {id: actionAddComment,            translation: 'Publiceren'}
 - {id: actionApprove,               translation: 'Goedkeuren'}
 - {id: actionCancel,                translation: 'Annuleren'}
 - {id: actionClose,                 translation: 'Sluiten'}
@@ -120,6 +120,7 @@
 - {id: statusEditedByModerator,     translation: 'bijgewerkt door moderator'}
 - {id: statusModerator,             translation: 'Moderator'}
 - {id: statusPending,               translation: 'In afwachting'}
+- {id: statusUnknownUser,           translation: 'Onbekende Gebruiker'}
 - {id: stickyComment,               translation: 'Sticky-comment'}
 - {id: technicalDetails,            translation: 'Technische details'}
 - {id: timeJustNow,                 translation: 'zojuist'}

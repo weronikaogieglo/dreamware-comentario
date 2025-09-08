@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: 'Compte créé avec succès. Vérifiez votre email et cliquez sur le lien de confirmation.'}
-- {id: actionAddComment,            translation: 'Ajouter un commentaire'}
+- {id: actionAddComment,            translation: 'Publier'}
 - {id: actionApprove,               translation: 'Confirmer'}
 - {id: actionCancel,                translation: 'Annuler'}
 - {id: actionClose,                 translation: 'Fermer'}
@@ -115,6 +115,7 @@
 - {id: statusEditedByModerator,     translation: 'modifié par un modérateur'}
 - {id: statusModerator,             translation: 'Modérateur'}
 - {id: statusPending,               translation: 'En attente'}
+- {id: statusUnknownUser,           translation: 'Utilisateur inconnu'}
 - {id: stickyComment,               translation: 'Commentaire épinglé'}
 - {id: technicalDetails,            translation: 'Détails technique'}
 - {id: timeJustNow,                 translation: 'à l''instant'}
