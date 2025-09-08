@@ -166,3 +166,41 @@ export class BlockEditorCommand extends EditorCommand {
         textarea.setSelectionRange(iStart + pLen, iStart + pLen);
     }
 }
+
+/**
+ * A command that opens a popup dialog for selecting emojis.
+ */
+export class EmojiPickerCommand extends EditorCommand {
+
+    /** Callback function to handle emoji selection */
+    readonly onEmojiSelect?: (emoji: string, textarea: HTMLTextAreaElement) => void;
+
+    constructor(props?: Partial<Record<keyof EmojiPickerCommand, any>>) {
+        super();
+        Object.assign(this, props);
+    }
+
+    override apply(textarea: HTMLTextAreaElement) {
+        // This method will be overridden in the comment editor
+        // to show the emoji picker dialog
+    }
+}
+
+/**
+ * A command that opens a popup dialog for selecting GIPHY GIFs.
+ */
+export class GiphyPickerCommand extends EditorCommand {
+
+    /** Callback function to handle GIF selection */
+    readonly onGifSelect?: (gif: any, textarea: HTMLTextAreaElement) => void;
+
+    constructor(props?: Partial<Record<keyof GiphyPickerCommand, any>>) {
+        super();
+        Object.assign(this, props);
+    }
+
+    override apply(textarea: HTMLTextAreaElement) {
+        // This method will be overridden in the comment editor
+        // to show the GIPHY picker dialog
+    }
+}

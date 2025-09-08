@@ -1,5 +1,5 @@
 - {id: accountCreatedConfirmEmail,  translation: 'Аккаунт успешно зарегистрирован. Мы отправили вам емэйл, пожалуйста, подтвердите свой адрес, перейдя по содержащейся в нём ссылке.'}
-- {id: actionAddComment,            translation: 'Добавить комментарий'}
+- {id: actionAddComment,            translation: 'Опубликовать'}
 - {id: actionApprove,               translation: 'Утвердить'}
 - {id: actionCancel,                translation: 'Отмена'}
 - {id: actionClose,                 translation: 'Закрыть'}
@@ -120,6 +120,7 @@
 - {id: statusEditedByModerator,     translation: 'изменён модератором'}
 - {id: statusModerator,             translation: 'Модератор'}
 - {id: statusPending,               translation: 'Ждёт модерации'}
+- {id: statusUnknownUser,           translation: 'Неизвестный пользователь'}
 - {id: stickyComment,               translation: 'Прилепленный комментарий.'}
 - {id: technicalDetails,            translation: 'Технические подробности'}
 - {id: timeJustNow,                 translation: 'только что'}

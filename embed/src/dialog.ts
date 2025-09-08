@@ -42,6 +42,14 @@ export class Dialog {
         return this._confirmed;
     }
 
+       /**
+     * Get the dialog box element.
+     * @protected
+     */
+       protected get dialogBoxElement(): Wrap<HTMLDivElement> | undefined {
+        return this.dialogBox;
+    }
+
     /**
      * Main method that show the dialog and resolves with the provided data when the dialog is closed.
      * @param data Data to resolve the promise with.

@@ -2,19 +2,22 @@ import { Wrap } from './element-wrap';
 import { UIToolkit } from './ui-toolkit';
 import { AsyncProcWithArg, PageInfo, TranslateFunc } from './models';
 import { Utils } from './utils';
-import { BlockEditorCommand, EditorCommand, InlineEditorCommand } from './editor-command';
+import { BlockEditorCommand, EditorCommand, InlineEditorCommand, EmojiPickerCommand, GiphyPickerCommand } from './editor-command';
+import { EmojiPickerDialog } from './emoji-picker-dialog';
+import { GiphyPickerDialog } from './giphy-picker-dialog';
 
 export type CommentEditorPreviewCallback = (markdown: string) => Promise<string>;
 
-export class CommentEditor extends Wrap<HTMLFormElement>{
+export class CommentEditor extends Wrap<HTMLFormElement> {
 
-    private readonly textarea:   Wrap<HTMLTextAreaElement>;
-    private readonly preview:    Wrap<HTMLDivElement>;
-    private readonly btnCancel:  Wrap<HTMLButtonElement>;
+    private readonly textarea: Wrap<HTMLTextAreaElement>;
+    private readonly preview: Wrap<HTMLDivElement>;
+    private readonly btnCancel: Wrap<HTMLButtonElement>;
     private readonly btnPreview: Wrap<HTMLButtonElement>;
-    private readonly btnSubmit:  Wrap<HTMLButtonElement>;
-    private readonly toolbar:    Wrap<HTMLDivElement>;
+    private readonly btnSubmit: Wrap<HTMLButtonElement>;
+    private readonly toolbar: Wrap<HTMLDivElement>;
     private readonly commands = this.createCommands();
+    private readonly isEdit: boolean;
 
     private previewing = false;
     private submitting = false;
@@ -42,31 +45,26 @@ export class CommentEditor extends Wrap<HTMLFormElement>{
     ) {
         super(UIToolkit.form(() => this.submitEdit(), () => this.cancelEdit()).element);
 
-        // Render the toolbar
+        this.isEdit = isEdit;
+
+        this.btnCancel = UIToolkit.button(this.t('actionCancel'), () => onCancel(this), 'btn-link');
+        this.btnPreview = UIToolkit.button(this.t('actionPreview'), () => this.togglePreview(), 'btn-secondary');
+        this.btnSubmit = UIToolkit.submit(this.t(isEdit ? 'actionSave' : 'actionAddComment'), false);
+
         this.toolbar = this.renderToolbar();
 
-        // Set up the form
         this.classes('comment-editor')
             .append(
-                // Toolbar
+
                 this.toolbar,
-                // Textarea
+
                 this.textarea = UIToolkit.textarea(null, true, true)
-                    .attr({name: 'comentario-comment-editor', maxlength: String(pageInfo.maxCommentLength)})
+                    .attr({ name: 'comentario-comment-editor', maxlength: String(pageInfo.maxCommentLength) })
                     .value(initialText)
                     .on('input', () => this.updateControls()),
                 // Preview
                 this.preview = UIToolkit.div('comment-editor-preview', 'hidden'),
-                // Editor footer
-                UIToolkit.div('comment-editor-footer')
-                    .append(
-                        // Cancel
-                        this.btnCancel = UIToolkit.button(this.t('actionCancel'), () => onCancel(this), 'btn-link'),
-                        // Preview
-                        this.btnPreview = UIToolkit.button(this.t('actionPreview'), () => this.togglePreview(), 'btn-secondary'),
-                        // Submit
-                        this.btnSubmit = UIToolkit.submit(this.t(isEdit ? 'actionSave' : 'actionAddComment'), false),
-                    ));
+            );
 
         // Install keyboard shortcuts
         this.installShortcuts();
@@ -126,110 +124,29 @@ export class CommentEditor extends Wrap<HTMLFormElement>{
      */
     private createCommands(): EditorCommand[] {
         const r: EditorCommand[] = [];
-        // Use Cmd+Key combinations on Mac, Ctrl+Key otherwise
-        const keyCtrl  = !UIToolkit.isMac;
-        const keyMeta  = UIToolkit.isMac;
-        const keyShift = true;
-        const placeholder = this.t('sampleText');
+
         r.push(
-            new InlineEditorCommand({
-                icon:    'bold',
-                titleId: 'btnBold',
-                pattern: '**$**{}',
-                keyCtrl,
-                keyMeta,
-                keyCode: 'KeyB',
-                placeholder,
-            }),
-            new InlineEditorCommand({
-                icon:    'italic',
-                titleId: 'btnItalic',
-                pattern: '*$*{}',
-                keyCtrl,
-                keyMeta,
-                keyCode: 'KeyI',
-                placeholder,
-            }),
-            new InlineEditorCommand({
-                icon:    'strikethrough',
-                titleId: 'btnStrikethrough',
-                pattern: '~~$~~{}',
-                keyCtrl,
-                keyMeta,
-                keyShift,
-                keyCode: 'KeyX',
-                placeholder,
-            }));
-        if (this.pageInfo.markdownLinksEnabled) {
-            r.push(
-                new InlineEditorCommand({
-                    icon:    'link',
-                    titleId: 'btnLink',
-                    pattern: '[$]({https://example.com})',
-                    keyCtrl,
-                    keyMeta,
-                    keyCode: 'KeyK',
-                    placeholder,
-                }));
-        }
+            new EmojiPickerCommand({
+                icon: 'emoji',
+                titleId: 'btnEmoji',
+                onEmojiSelect: (emoji: string, textarea: HTMLTextAreaElement) => {
+                    this.insertEmoji(emoji, textarea);
+                }
+            })
+        );
+
         r.push(
-            new BlockEditorCommand({
-                icon:    'quote',
-                titleId: 'btnQuote',
-                pattern: '> ',
-                keyCtrl,
-                keyMeta,
-                keyShift,
-                keyCode: 'Period',
-                keyName: '.',
-            }),
-            new InlineEditorCommand({
-                icon:    'code',
-                titleId: 'btnCode',
-                pattern: '`$`{}',
-                keyCtrl,
-                keyMeta,
-                keyCode: 'KeyE',
-                placeholder,
-            }));
-        if (this.pageInfo.markdownImagesEnabled) {
-            r.push(
-                new InlineEditorCommand({
-                    icon:        'image',
-                    titleId:     'btnImage',
-                    pattern:     '![]($){}',
-                    placeholder: 'https://example.com/image.png',
-                }));
-        }
-        if (this.pageInfo.markdownTablesEnabled) {
-            r.push(
-                new InlineEditorCommand({
-                    icon:        'table',
-                    titleId:     'btnTable',
-                    pattern:     '\n| $ | {Heading} |\n|---------|---------|\n| Text    | Text    |\n',
-                    placeholder: 'Heading',
-                }));
-        }
-        r.push(
-            new BlockEditorCommand({
-                icon:    'bulletList',
-                titleId: 'btnBulletList',
-                pattern: '* ',
-                keyCtrl,
-                keyMeta,
-                keyShift,
-                keyCode: 'Digit8',
-            }),
-            new BlockEditorCommand({
-                icon:    'numberedList',
-                titleId: 'btnNumberedList',
-                pattern: '1. ',
-                keyCtrl,
-                keyMeta,
-                keyShift,
-                keyCode: 'Digit7',
-            }));
+            new GiphyPickerCommand({
+                icon: 'giphy',
+                titleId: 'btnGiphy',
+                onGifSelect: async (gif: any, textarea: HTMLTextAreaElement) => {
+                    await this.insertGif(gif, textarea);
+                }
+            })
+        );
+
         return r;
+
     }
 
     /**
@@ -260,12 +177,13 @@ export class CommentEditor extends Wrap<HTMLFormElement>{
             UIToolkit.div('toolbar-section')
                 .append(...this.commands.map(
                     c => UIToolkit.toolButton(c.icon, this.t(c.titleId) + c.keyTitle, () => this.runCommand(c)))),
-            // Right section
             UIToolkit.div('toolbar-section').append(
-                // Editor help link
+                this.btnCancel,
+                this.btnPreview,
+                this.btnSubmit,
                 UIToolkit.a('', Utils.joinUrl(this.pageInfo.baseDocsUrl, this.pageInfo.defaultLangId, 'kb/comment-editor/'))
                     .classes('btn', 'btn-tool')
-                    .attr({title: this.t('btnEditorHelp')})
+                    .attr({ title: this.t('btnEditorHelp') })
                     .append(UIToolkit.icon('help')),
             ));
     }
@@ -294,29 +212,22 @@ export class CommentEditor extends Wrap<HTMLFormElement>{
      * @param c Command to run.
      * @private
      */
-    private runCommand(c: EditorCommand) {
-        // Apply the command
-        c.apply(this.textarea.element);
+    private async runCommand(c: EditorCommand) {
+        // Check if it's an emoji picker command
+        if (c instanceof EmojiPickerCommand) {
+            await this.showEmojiPicker();
+        } else if (c instanceof GiphyPickerCommand) {
+            await this.showGiphyPicker();
+        } else {
+            // Apply the command
+            c.apply(this.textarea.element);
+        }
 
         // Update controls to reflect changes in the text
         this.updateControls();
 
         // Re-focus the textarea
         this.textarea.focus();
-    }
-
-    /**
-     * Cancel the editor.
-     * @private
-     */
-    private cancelEdit() {
-        // Ignore while submitting
-        if (this.submitting) {
-            return;
-        }
-
-        // Invoke the callback
-        this.onCancel(this);
     }
 
     /**
@@ -339,5 +250,118 @@ export class CommentEditor extends Wrap<HTMLFormElement>{
             this.submitting = false;
             this.updateControls();
         }
+    }
+
+    /**
+    * Show the emoji picker dialog and insert selected emoji.
+    * @private
+    */
+    private async showEmojiPicker() {
+        try {
+            const emoji = await EmojiPickerDialog.run(
+                this.t,
+                this.parent,
+                { ref: this.toolbar, placement: 'bottom-start' }
+            );
+
+            if (emoji) {
+                this.insertEmoji(emoji, this.textarea.element);
+            }
+        } catch (error) {
+            console.error('Failed to show emoji picker:', error);
+        }
+    }
+
+    /**
+     * Insert emoji at cursor position or replace selection.
+     * @param emoji Emoji to insert.
+     * @param textarea Textarea element.
+     * @private
+     */
+    /**
+     * Insert emoji at cursor position or replace selection.
+     * @param emoji Emoji to insert.
+     * @param textarea Textarea element.
+     * @private
+     */
+    private insertEmoji(emoji: string, textarea: HTMLTextAreaElement) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+
+        // Replace selection with emoji or insert at cursor
+        const newText = text.substring(0, start) + emoji + text.substring(end);
+        textarea.value = newText;
+
+        // Set cursor position after emoji
+        const newPosition = start + emoji.length;
+        textarea.setSelectionRange(newPosition, newPosition);
+
+        // Trigger input event to update controls
+        this.updateControls();
+    }
+
+    /**
+     * Show the GIPHY picker dialog and insert selected GIF.
+     * @private
+     */
+    private async showGiphyPicker() {
+        try {
+            const gif = await GiphyPickerDialog.run(
+                this.t,
+                this.parent,
+                { ref: this.toolbar, placement: 'bottom-start' }
+            );
+
+            if (gif) {
+                await this.insertGif(gif, this.textarea.element);
+            }
+        } catch (error) {
+            console.error('Failed to show GIPHY picker:', error);
+        }
+    }
+
+    /**
+     * Insert GIF at cursor position or replace selection.
+     * @param gif GIF object to insert.
+     * @param textarea Textarea element.
+     * @private
+     */
+    private async insertGif(gif: any, textarea: HTMLTextAreaElement) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+
+        // Create markdown image link for the GIF
+        const gifMarkdown = `![${gif.title}](${gif.images.original.url})`;
+
+        // Replace selection with GIF markdown or insert at cursor
+        const newText = text.substring(0, start) + gifMarkdown + text.substring(end);
+        textarea.value = newText;
+
+        // Set cursor position after GIF markdown
+        const newPosition = start + gifMarkdown.length;
+        textarea.setSelectionRange(newPosition, newPosition);
+
+        // Trigger input event to update controls
+        this.updateControls();
+
+        // Automatically enable preview mode to show the GIF
+        if (!this.previewing) {
+            await this.togglePreview();
+        }
+    }
+    /**
+ * Cancel the editor.
+ * @private
+ */
+    private cancelEdit() {
+        // Ignore while submitting
+        if (this.submitting) {
+            return;
+        }
+
+        // Invoke the callback
+        this.onCancel(this);
     }
 }
